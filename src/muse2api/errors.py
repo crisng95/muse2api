@@ -82,6 +82,12 @@ class UpstreamTimeout(UpstreamError):
     code = "upstream_timeout"
 
 
+class UpstreamGlitch(UpstreamError):
+    """muse.ai's agent failed mid-turn ("Sorry, I ran into a problem..."); another try usually works."""
+
+    code = "upstream_glitch"
+
+
 class UpstreamRefused(UpstreamError):
     """Upstream answered but did not produce what was asked (e.g. text instead of an image)."""
 

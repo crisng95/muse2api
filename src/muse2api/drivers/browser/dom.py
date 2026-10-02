@@ -21,6 +21,8 @@ FILE_INPUT = 'input[type="file"]'
 LOGIN_HINTS = ("log in", "sign in", "create an account", "use another account")
 QUOTA_HINTS = ("out of credits", "usage limit", "limit reached", "token limit")
 STALL_HINTS = ("Still sending", "Connecting...")
+# The whole reply muse.ai shows when its agent errors out mid-turn.
+GLITCH_HINTS = ("ran into a problem while responding",)
 
 
 def q(value: str) -> str:

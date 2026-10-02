@@ -180,6 +180,22 @@ async def test_text_only_reply_asks_for_the_file_once(driver, fast, monkeypatch)
     assert len(sent) == 1 and "attach the final image" in sent[0]
 
 
+async def test_agent_error_reply_fails_over_without_asking(driver, fast, monkeypatch):
+    from muse2api.errors import UpstreamGlitch
+
+    sent = []
+
+    async def send(tab, text):
+        sent.append(text)
+
+    monkeypatch.setattr(driver, "_send", send)
+    oops = {**DONE, "lastText": "Sorry, I ran into a problem while responding. Please try again."}
+    with pytest.raises(UpstreamGlitch) as err:
+        await driver._wait_media(_media_tab([oops]), {"agentCount": 0, "attachments": []},
+                                 "image", 30, None, None)
+    assert err.value.retryable and not sent
+
+
 async def test_still_text_only_after_asking_is_refused(driver, fast, monkeypatch):
     from muse2api.errors import UpstreamRefused
 

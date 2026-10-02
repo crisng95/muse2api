@@ -112,13 +112,14 @@ async def test_acquire_fails_fast_when_cooldown_outlasts_timeout(tmp_path):
     assert time.monotonic() - started < 0.1
 
 
-async def test_timeout_does_not_cool_the_account(tmp_path):
-    from muse2api.errors import UpstreamTimeout
+@pytest.mark.parametrize("name", ["UpstreamTimeout", "UpstreamGlitch"])
+async def test_timeout_does_not_cool_the_account(tmp_path, name):
+    import muse2api.errors as errors
 
     pool = await _pool(tmp_path, n=1)
-    with pytest.raises(UpstreamTimeout):
+    with pytest.raises(getattr(errors, name)):
         async with pool.lease():
-            raise UpstreamTimeout("video generation timed out")
+            raise getattr(errors, name)("video generation timed out")
     acc = pool.get("a0")
     assert acc.status == AccountStatus.ACTIVE and acc.fail_count == 1
     assert (await pool.acquire()).id == "a0"

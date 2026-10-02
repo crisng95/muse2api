@@ -29,6 +29,7 @@ from ...core.prompt import followup_text
 from ...errors import (
     UpstreamAuthError,
     UpstreamError,
+    UpstreamGlitch,
     UpstreamQuotaError,
     UpstreamRefused,
     UpstreamTimeout,
@@ -619,6 +620,10 @@ class BrowserDriver(MuseDriver):
                 if text_done_at is None:
                     text_done_at = time.monotonic()
                 elif time.monotonic() - text_done_at >= grace:
+                    # Asking for the file after this only produced the same error
+                    # again; a fresh try on another account usually works.
+                    if any(h in text.lower() for h in dom.GLITCH_HINTS):
+                        raise UpstreamGlitch(f"muse.ai failed while responding: {text[:200]}")
                     if not asked_to_attach:
                         # The agent often finishes with the file only in its workspace:
                         # after a denied upload, after post-processing that it shows as
