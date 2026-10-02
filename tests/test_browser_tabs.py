@@ -207,6 +207,18 @@ async def test_timeout_is_soft_while_still_generating(driver, fast):
     assert await asyncio.wait_for(task, 1) == IMG
 
 
+async def test_soft_timeout_ends_once_the_reply_stops_changing(driver, fast, monkeypatch):
+    from muse2api.errors import UpstreamTimeout
+
+    monkeypatch.setattr(BrowserDriver, "_OVERRUN_FACTOR", 1000)  # only the stall can end it
+    monkeypatch.setattr(BrowserDriver, "_STALL_AFTER", {"image": 0.05})
+    stuck = {"agentCount": 1, "lastText": "Loaded media tool namespace", "generating": True,
+             "attachments": []}
+    with pytest.raises(UpstreamTimeout):
+        await asyncio.wait_for(driver._wait_media(
+            _media_tab([stuck]), {"agentCount": 0, "attachments": []}, "image", 0.05, None, None), 1)
+
+
 async def test_quota_hint_only_counts_in_the_finished_reply(driver):
     from muse2api.errors import UpstreamQuotaError
 

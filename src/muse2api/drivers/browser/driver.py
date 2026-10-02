@@ -563,18 +563,26 @@ class BrowserDriver(MuseDriver):
     # shown or attachment loading): giving up then threw away images that landed
     # a minute later, and the failover started the whole generation over.
     _OVERRUN_FACTOR = 2.5
+    # ...but only while the reply is still moving. A stuck agent turn (tools
+    # loaded, generation never called) keeps the stop button up indefinitely,
+    # and waiting out the full overrun on it cost clients 10-25 minutes.
+    _STALL_AFTER = {"video": 240.0, "image": 120.0}
 
     async def _wait_media(self, tab: _Tab, base: dict, kind: str, timeout: float,
                           on_progress, cancel: asyncio.Event | None) -> dict:
         base_atts = len(base.get("attachments", []))
         base_count = base.get("agentCount", 0)
         grace = self._MEDIA_GRACE.get(kind, 8.0)
-        started = time.monotonic()
+        stall_after = self._STALL_AFTER.get(kind, 120.0)
+        started = changed_at = time.monotonic()
         text_done_at: float | None = None
-        denied = asked_to_attach = busy = False
+        denied = asked_to_attach = busy = loading = False
+        last_sig: tuple | None = None
         while True:
-            elapsed = time.monotonic() - started
-            if elapsed >= timeout and not (busy and elapsed < timeout * self._OVERRUN_FACTOR):
+            now = time.monotonic()
+            elapsed, quiet = now - started, now - changed_at
+            if elapsed >= timeout and not (busy and elapsed < timeout * self._OVERRUN_FACTOR
+                                           and (loading or quiet < stall_after)):
                 break
             if cancel and cancel.is_set():
                 raise asyncio.CancelledError
@@ -587,14 +595,21 @@ class BrowserDriver(MuseDriver):
             new_atts = st.get("attachments", [])[base_atts:]
             fresh = [a for a in new_atts if a.get("src") and a.get("kind") == kind]
             if fresh:
+                if (waited := time.monotonic() - started) > timeout:
+                    log.info("%s arrived %.0fs past the %.0fs timeout", kind, waited - timeout, timeout)
                 return fresh[-1]
-            busy = bool(st.get("generating")) or any(kind in (a.get("tid") or "") for a in new_atts)
+            sig = (st.get("agentCount", 0), st.get("lastText", ""),
+                   tuple(a.get("tid") or "" for a in new_atts))
+            if sig != last_sig:
+                last_sig, changed_at = sig, time.monotonic()
+            loading = any(kind in (a.get("tid") or "") for a in new_atts)
+            busy = bool(st.get("generating")) or loading
             elapsed = time.monotonic() - started
             if on_progress:
                 on_progress(min(95, int(elapsed / timeout * 100)))
             # An attachment node for this kind is on the page but its (blob) src
             # has not loaded yet -> media is still finalising, keep waiting.
-            if any(kind in (a.get("tid") or "") for a in new_atts):
+            if loading:
                 text_done_at = None
                 continue
             # No attachment yet. The reply may be genuinely text-only (a refusal),
@@ -630,7 +645,8 @@ class BrowserDriver(MuseDriver):
             else:
                 text_done_at = None
         if busy:
-            log.warning("%s still generating after %.0fs; giving up", kind, elapsed)
+            log.warning("%s still generating after %.0fs (reply unchanged for %.0fs); giving up: %.160s",
+                        kind, elapsed, quiet, (last_sig or (0, ""))[1].replace("\n", " "))
         raise UpstreamTimeout(f"{kind} generation timed out")
 
     _VIDEO_EXT = (".mp4", ".webm", ".mov", ".m4v")
