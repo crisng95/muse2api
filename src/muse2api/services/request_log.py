@@ -3,7 +3,9 @@
 Rows are written by ``api.middleware.RequestLogMiddleware``. Code deeper in the
 stack (the gateway) adds to the in-flight row through ``current_record``. Async
 image/video submits return 200 straight away, so the task's outcome is written back
-onto the submit row when it finishes (``finish_task``) and counts as an error. All
+onto the submit row when it finishes (``finish_task``) and counts as an error. Each
+attempt that failed on an account (including ones the gateway then failed over from,
+which the client never sees) goes into ``attempt_errors`` as well. All
 database work runs in a worker thread; a failed write is logged and dropped,
 never surfaced to the client.
 """
@@ -27,7 +29,8 @@ log = logging.getLogger(__name__)
 current_record: ContextVar[dict[str, Any] | None] = ContextVar("current_record", default=None)
 
 COLUMNS = ("ts", "method", "path", "model", "key_id", "key_name", "account_id", "status_code",
-           "latency_ms", "stream", "poll", "error", "client_ip", "user_agent", "task_id")
+           "latency_ms", "stream", "poll", "error", "client_ip", "user_agent", "task_id",
+           "failed_attempts")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS requests (
@@ -52,13 +55,21 @@ CREATE INDEX IF NOT EXISTS idx_requests_ts ON requests (ts);
 CREATE INDEX IF NOT EXISTS idx_requests_key ON requests (key_id, ts);
 CREATE INDEX IF NOT EXISTS idx_requests_account ON requests (account_id, ts);
 CREATE INDEX IF NOT EXISTS idx_requests_task ON requests (task_id);
+CREATE TABLE IF NOT EXISTS attempt_errors (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          REAL    NOT NULL,
+    account_id  TEXT,
+    error       TEXT,
+    task_id     TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_attempt_errors_ts ON attempt_errors (ts);
 """
 
 # Columns added after the first release; created on open when missing.
-_ADDED_COLUMNS = {"task_status": "TEXT", "task_ms": "INTEGER"}
+_ADDED_COLUMNS = {"task_status": "TEXT", "task_ms": "INTEGER", "failed_attempts": "INTEGER"}
 
 # A request failed if it got an HTTP error or its async task failed later.
-FAILED = "(status_code >= 400 OR task_status = 'failed')"
+FAILED = "(status_code >= 400 OR COALESCE(task_status = 'failed', 0))"
 
 # window -> (length, bucket size) in seconds
 WINDOWS = {"1h": (3600, 60), "24h": (86400, 1800), "7d": (7 * 86400, 3 * 3600)}
@@ -72,6 +83,14 @@ def note_account(account_id: str) -> None:
     record = current_record.get()
     if record is not None:
         record["account_id"] = account_id
+
+
+def note_failed_attempt(account_id: str, error: BaseException) -> None:
+    """Record an attempt that failed on ``account_id``, whether or not a failover follows."""
+    record = current_record.get()
+    if record is not None:
+        record.setdefault("attempt_errors", []).append(
+            (time.time(), account_id, str(error)[:300]))
 
 
 def _percentile(sorted_values: list[int], q: float) -> int | None:
@@ -128,13 +147,17 @@ class RequestLog:
 
     # ---- writes ----
     async def add(self, record: dict[str, Any]) -> None:
-        record = {"stream": 0, "poll": 0, **record}
+        task_id = None if record.get("poll") else record.get("task_id")
+        # An async task's attempts happen after this row is written; finish_task logs them.
+        attempts = [] if task_id else list(record.get("attempt_errors") or [])
+        record = {"stream": 0, "poll": 0, **record, "failed_attempts": len(attempts)}
         row = tuple(record.get(c) for c in COLUMNS)
         sql = f"INSERT INTO requests ({', '.join(COLUMNS)}) VALUES ({', '.join('?' * len(COLUMNS))})"
-        task_id = None if record["poll"] else record.get("task_id")
 
         def run(db: sqlite3.Connection) -> None:
             db.execute(sql, row)
+            if attempts:
+                db.executemany(_ATTEMPT_SQL, [(*a, None) for a in attempts])
             # Under the same lock as finish_task, so an outcome is never stashed
             # just after this row went in.
             if task_id and (early := self._early.pop(task_id, None)):
@@ -146,11 +169,15 @@ class RequestLog:
             log.exception("failed to write request log row")
 
     async def finish_task(self, task_id: str, status: str, finished_at: float,
-                          error: str | None = None, account_id: str | None = None) -> None:
+                          error: str | None = None, account_id: str | None = None,
+                          attempt_errors: list[tuple] | None = None) -> None:
         """Write an async task's outcome onto the request that submitted it."""
-        args = (status, finished_at, error, account_id, task_id)
+        attempts = list(attempt_errors or [])
+        args = (status, finished_at, error, account_id, len(attempts), task_id)
 
         def run(db: sqlite3.Connection) -> None:
+            if attempts:
+                db.executemany(_ATTEMPT_SQL, [(*a, task_id) for a in attempts])
             if not db.execute(_FINISH_SQL, args).rowcount:
                 # The task beat the response out (e.g. no account available); the
                 # submit row picks the outcome up when the middleware writes it.
@@ -165,7 +192,7 @@ class RequestLog:
 
     async def backfill_tasks(self, tasks: list[Any]) -> None:
         """Fill in outcomes for submit rows logged before outcomes were recorded."""
-        rows = [(t.status.value, t.updated_at, (t.error or {}).get("message"), None, t.id)
+        rows = [(t.status.value, t.updated_at, (t.error or {}).get("message"), None, None, t.id)
                 for t in tasks if t.finished]
         if not rows:
             return
@@ -177,9 +204,13 @@ class RequestLog:
 
     async def prune(self, retention_days: float) -> int:
         cutoff = time.time() - retention_days * 86400
+
+        def run(db: sqlite3.Connection) -> sqlite3.Cursor:
+            db.execute("DELETE FROM attempt_errors WHERE ts < ?", (cutoff,))
+            return db.execute("DELETE FROM requests WHERE ts < ?", (cutoff,))
+
         try:
-            cur = await asyncio.to_thread(
-                self._call, lambda db: db.execute("DELETE FROM requests WHERE ts < ?", (cutoff,)))
+            cur = await asyncio.to_thread(self._call, run)
         except Exception:  # noqa: BLE001
             log.exception("failed to prune request log")
             return 0
@@ -248,6 +279,19 @@ class RequestLog:
                 args).fetchone()
             latencies = [r[0] for r in db.execute(
                 f"SELECT latency_ms FROM requests WHERE {cond} ORDER BY latency_ms", args)]
+            failed_attempts, rescued = db.execute(
+                f"SELECT COALESCE(SUM(failed_attempts), 0), "
+                f"COALESCE(SUM(failed_attempts > 0 AND NOT {FAILED}), 0) "
+                f"FROM requests WHERE {cond}", args).fetchone()
+            attempts_by_account = {r[0]: r[1] for r in db.execute(
+                "SELECT account_id, COUNT(*) FROM attempt_errors WHERE ts >= ? GROUP BY account_id",
+                (start,))}
+            by_account = grouped(db, "account_id")
+            for row in by_account:
+                row["attempt_errors"] = attempts_by_account.pop(row["account_id"], 0)
+            # Accounts that only failed (every request moved on to another account).
+            by_account += [{"account_id": acc, "count": 0, "errors": 0, "attempt_errors": n}
+                           for acc, n in attempts_by_account.items()]
             series = [{"t": start + i * bucket, "count": 0, "errors": 0} for i in range(n_buckets)]
             for idx, count, errs in db.execute(
                     f"SELECT CAST((ts - ?) / ? AS INTEGER) AS b, COUNT(*), "
@@ -263,10 +307,14 @@ class RequestLog:
                 "errors": errors,
                 "server_errors": server_errors,
                 "error_rate": errors / total if total else 0.0,
+                # Attempts that failed on some account; "rescued" requests still
+                # succeeded on another one, so the client never saw those errors.
+                "failed_attempts": failed_attempts,
+                "rescued": rescued,
                 "latency_ms": {"p50": _percentile(latencies, 0.50),
                                "p95": _percentile(latencies, 0.95)},
                 "by_key": grouped(db, "key_id, key_name"),
-                "by_account": grouped(db, "account_id"),
+                "by_account": by_account,
                 "by_model": grouped(db, "model"),
                 "by_status": grouped(db, "status_code"),
                 "series": series,
@@ -296,9 +344,11 @@ class RequestLog:
 
 _FINISH_SQL = (
     "UPDATE requests SET task_status = ?, task_ms = CAST((? - ts) * 1000 AS INTEGER), "
-    "error = COALESCE(error, ?), account_id = COALESCE(account_id, ?) "
+    "error = COALESCE(error, ?), account_id = COALESCE(account_id, ?), "
+    "failed_attempts = COALESCE(?, failed_attempts) "
     "WHERE task_id = ? AND poll = 0"
 )
+_ATTEMPT_SQL = "INSERT INTO attempt_errors (ts, account_id, error, task_id) VALUES (?, ?, ?, ?)"
 
 
 def _row(r: sqlite3.Row) -> dict[str, Any]:

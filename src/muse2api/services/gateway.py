@@ -11,7 +11,7 @@ from ..accounts.model import Account
 from ..accounts.pool import AccountPool, Lease
 from ..drivers.base import ChatRequest, ImageRequest, MediaResult, MuseDriver, VideoRequest
 from ..errors import UpstreamError
-from .request_log import note_account
+from .request_log import note_account, note_failed_attempt
 
 log = logging.getLogger(__name__)
 T = TypeVar("T")
@@ -53,6 +53,7 @@ class Gateway:
                     return
                 except UpstreamError as exc:
                     lease.fail(exc)
+                    note_failed_attempt(lease.account.id, exc)
                     tried.append(lease.account.id)
                     # Once text reached the client we cannot transparently switch accounts.
                     if emitted or not self._should_retry(exc, attempt, tried):
@@ -67,6 +68,7 @@ class Gateway:
                     return await fn(lease.account)
                 except UpstreamError as exc:
                     lease.fail(exc)
+                    note_failed_attempt(lease.account.id, exc)
                     tried.append(lease.account.id)
                     if not self._should_retry(exc, attempt, tried):
                         raise

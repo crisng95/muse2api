@@ -131,3 +131,18 @@ async def test_other_upstream_errors_still_cool_down(tmp_path):
         async with pool.lease():
             raise UpstreamError("browser error")
     assert pool.get("a0").status == AccountStatus.COOLING
+
+
+async def test_failover_is_noted_on_the_request(tmp_path):
+    from muse2api.services.request_log import current_record
+
+    pool = await _pool(tmp_path, n=2, strategy="round_robin")
+    record: dict = {}
+    token = current_record.set(record)
+    try:
+        gw = Gateway(pool, _FlakyDriver({"a0"}), max_failover=2)
+        _ = [d async for d in gw.chat_stream(ChatRequest(prompt="hi", model="m"))]
+    finally:
+        current_record.reset(token)
+    assert record["account_id"] == "a1"
+    assert [(acc, err) for _, acc, err in record["attempt_errors"]] == [("a0", "boom")]

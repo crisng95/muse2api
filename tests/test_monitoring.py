@@ -284,3 +284,32 @@ async def test_task_outcome_before_row_and_backfill(settings):
     assert rows["task_old"]["task_status"] == "failed"
     assert (await log.stats("1h"))["errors"] == 2
     await log.close()
+
+
+async def test_failed_attempts_counted_even_when_rescued(settings):
+    import time
+
+    from muse2api.services.request_log import RequestLog
+
+    log = RequestLog(settings.requests_db)
+    now = time.time()
+    base = {"method": "POST", "path": "/v1/images/generations", "status_code": 200,
+            "latency_ms": 5, "ts": now, "poll": 0}
+    # Sync request: failed on acc_a, then succeeded on acc_b.
+    await log.add({**base, "account_id": "acc_b",
+                   "attempt_errors": [(now, "acc_a", "image generation timed out")]})
+    # Async task: the submit row is written before the attempts happen.
+    await log.add({**base, "task_id": "task_1"})
+    await log.finish_task("task_1", "succeeded", now + 9, None, "acc_c",
+                          [(now + 4, "acc_a", "timed out"), (now + 6, "acc_b", "glitch")])
+    await log.add({**base, "status_code": 200})  # clean request
+
+    s = await log.stats("1h")
+    assert s["total"] == 3 and s["errors"] == 0
+    assert s["failed_attempts"] == 3 and s["rescued"] == 2
+    by_acc = {r["account_id"]: r for r in s["by_account"]}
+    assert by_acc["acc_a"]["attempt_errors"] == 2 and by_acc["acc_a"]["count"] == 0
+    assert by_acc["acc_b"]["attempt_errors"] == 1 and by_acc["acc_b"]["count"] == 1
+    rows = {r["task_id"]: r for r in (await log.query())["data"]}
+    assert rows["task_1"]["failed_attempts"] == 2
+    await log.close()

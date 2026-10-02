@@ -46,7 +46,8 @@ class Services:
             record = current_record.get()
             await requests.finish_task(task.id, task.status.value, task.updated_at,
                                        (task.error or {}).get("message"),
-                                       record.get("account_id") if record else None)
+                                       record.get("account_id") if record else None,
+                                       record.get("attempt_errors") if record else None)
 
         return cls(
             settings=settings,

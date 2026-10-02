@@ -544,9 +544,10 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
   const TASK_BADGE = { succeeded: ["b-ok", "ok"], failed: ["b-err", "failed"],
                        cancelled: ["b-mute", "cancelled"] };
   function taskBadge(r) {
-    if (r.poll || !r.task_id) return "";
+    const retry = r.failed_attempts ? ` <span class="badge plain b-warn" title="${esc(r.failed_attempts)} lần thử lỗi, đã chuyển sang account khác">↻${esc(r.failed_attempts)}</span>` : "";
+    if (r.poll || !r.task_id) return retry;
     const [cls, txt] = TASK_BADGE[r.task_status] || ["b-info", "running"];
-    return ` <span class="badge plain ${cls}">${esc(txt)}</span>`;
+    return ` <span class="badge plain ${cls}">${esc(txt)}</span>${retry}`;
   }
   function accountLabel(id) {
     if (!id) return "";
@@ -890,8 +891,9 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     }).join("") || `<div class="empty">Chưa có request</div>`;
   }
 
-  function accountsSummary() {
+  function accountsSummary(byAccount) {
     const t = now();
+    const win = Object.fromEntries((byAccount || []).map((r) => [r.account_id, r]));
     const order = {quota: 0, invalid: 1, cooling: 2, active: 3, disabled: 4};
     const list = [...state.accounts].sort((a, b) => order[accState(a, t).key] - order[accState(b, t).key]);
     return list.slice(0, 7).map((a) => {
@@ -901,7 +903,11 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
         <span class="dot ${s.cls}"></span>
         <span class="lbl" title="${esc([a.label || a.id, a.email].filter(Boolean).join(" · "))}">${esc(a.label || a.id)}${a.email ? ` <span class="muted">· ${esc(a.email)}</span>` : ""}</span>
         <span class="badge plain ${s.badge}">${esc(s.label)}${cool ? ` · <span class="mono" data-until="${esc(a.cooldown_until)}">${esc(countdown(a.cooldown_until - t))}</span>` : ""}</span>
-        <span class="n" title="thành công / thất bại">${fmtNum(a.success_count)}<span class="muted">/</span><span class="${a.fail_count ? "e" : "muted"}" style="${a.fail_count ? "color:var(--err)" : ""}">${fmtNum(a.fail_count)}</span></span>
+        ${(() => {
+          // Same window as the tiles; the lifetime counters stay on the Accounts page.
+          const w = win[a.id] || {}, fails = w.attempt_errors || 0;
+          return `<span class="n" title="${esc(state.window)}: request phục vụ / lần thử lỗi trên account này (kể cả lần đã chuyển sang acc khác)">${fmtNum(w.count || 0)}<span class="muted">/</span><span class="${fails ? "e" : "muted"}" style="${fails ? "color:var(--err)" : ""}">${fmtNum(fails)}</span></span>`;
+        })()}
       </div>`;
     }).join("") + (list.length > 7 ? `<div class="li muted" style="font-size:12px">+${list.length - 7} account khác</div>` : "")
       || `<div class="empty">Chưa có account</div>`;
@@ -921,7 +927,10 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     const activeKeys = state.keys.filter((k) => !k.revoked).length;
     $("#tiles").innerHTML = [
       tile("Requests", fmtNum(stats.total), `${stats.window} gần nhất`),
-      tile("Tỉ lệ lỗi", fmtPct(stats.error_rate), `${fmtNum(stats.errors)} lỗi · ${fmtNum(stats.server_errors)} 5xx`, stats.error_rate >= 0.1 ? "bad" : ""),
+      tile("Tỉ lệ lỗi", fmtPct(stats.error_rate),
+        // Client-facing errors, then attempts that failed on an account (mostly rescued by failover).
+        `${fmtNum(stats.errors)} lỗi · ${fmtNum(stats.failed_attempts)} lần acc lỗi`,
+        stats.error_rate >= 0.1 ? "bad" : stats.failed_attempts ? "warn" : ""),
       tile("Độ trễ p95", fmtMs(stats.latency_ms.p95), `p50 ${fmtMs(stats.latency_ms.p50)}`),
       tile("Accounts sẵn sàng", `${fmtNum(pool.available)}/${fmtNum(pool.total)}`, `${fmtNum(pool.inflight)} đang xử lý`, pool.total && !pool.available ? "warn" : ""),
       tile("API keys", fmtNum(activeKeys), `đang hoạt động · ${fmtNum(state.keys.length - activeKeys)} đã thu hồi`),
@@ -934,7 +943,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
       {attrs: (r) => r.key_id ? `data-key="${esc(r.key_id)}" tabindex="0"` : ""});
     $("#ov-models").innerHTML = meterList(stats.by_model, (r) => r.model || "(không có)");
     $("#ov-status").innerHTML = meterList(stats.by_status, (r) => String(r.status_code));
-    $("#ov-accounts").innerHTML = accountsSummary();
+    $("#ov-accounts").innerHTML = accountsSummary(stats.by_account);
   }
 
   function overviewNav(e) {
@@ -1163,6 +1172,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
       ["Status", r.status_code], ["Latency", fmtMs(r.latency_ms)], ["Stream", r.stream ? "yes" : "no"],
       ["Poll", r.poll ? "yes" : "no"], ["Model", r.model], ["Key", r.key_name ? `${r.key_name} (${r.key_id})` : ""],
       ["Account", r.account_id ? `${accountLabel(r.account_id)} (${r.account_id})` : ""],
+      ["Lần thử lỗi", r.failed_attempts ? `${r.failed_attempts} (đã chuyển account)` : ""],
       ["Task", r.task_id ? `${r.task_id} · ${r.task_status || "running"}${r.task_ms != null ? ` · ${fmtMs(r.task_ms)}` : ""}` : ""], ["Client IP", r.client_ip], ["User agent", r.user_agent],
     ];
     modal({
