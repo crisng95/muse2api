@@ -61,6 +61,7 @@ class VideoCreateRequest(_Lenient):
 
 class AccountCreate(BaseModel):
     label: str = ""
+    email: str = Field(default="", max_length=254)
     cookies: dict[str, str]
     cookie_expires: dict[str, int] = Field(default_factory=dict)
     enabled: bool = True
@@ -68,6 +69,7 @@ class AccountCreate(BaseModel):
 
 class AccountUpdate(BaseModel):
     label: str | None = None
+    email: str | None = Field(default=None, max_length=254)
     enabled: bool | None = None
     cookies: dict[str, str] | None = None
     cookie_expires: dict[str, int] | None = None

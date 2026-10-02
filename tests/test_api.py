@@ -264,6 +264,10 @@ def test_admin_accounts_crud(client, auth, admin):
 
     r = client.patch(f"/admin/accounts/{acc['id']}", headers=admin, json={"enabled": False})
     assert r.json()["account"]["enabled"] is False
+    assert acc["email"] == ""
+    r = client.patch(f"/admin/accounts/{acc['id']}", headers=admin, json={"email": " a1@example.com "})
+    assert r.json()["account"]["email"] == "a1@example.com"
+    assert r.json()["account"]["enabled"] is False
 
     assert len(client.get("/admin/accounts", headers=admin).json()["data"]) == 1
     assert client.post(f"/admin/accounts/{acc['id']}/renew", headers=admin).json()["ok"]

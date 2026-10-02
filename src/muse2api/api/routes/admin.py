@@ -51,7 +51,7 @@ async def create_account(body: AccountCreate, svc: Services = Depends(get_servic
     cookies = {k: v for k, v in body.cookies.items() if v}
     if not cookies:
         raise InvalidRequest("cookies must not be empty")
-    acc = Account(label=body.label, cookies=cookies, cookie_expires=body.cookie_expires,
+    acc = Account(label=body.label, email=body.email.strip(), cookies=cookies, cookie_expires=body.cookie_expires,
                   enabled=body.enabled)
     await svc.pool.upsert(acc)
     return {"account": acc.public(), "missing_cookies": missing_session_cookies(cookies)}
@@ -63,6 +63,8 @@ async def update_account(account_id: str, body: AccountUpdate,
     acc = _get(svc, account_id)
     if body.label is not None:
         acc.label = body.label
+    if body.email is not None:
+        acc.email = body.email.strip()
     if body.enabled is not None:
         acc.enabled = body.enabled
     if body.cookies is not None:

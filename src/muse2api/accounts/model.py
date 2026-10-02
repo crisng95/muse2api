@@ -23,6 +23,8 @@ def _now() -> float:
 class Account(BaseModel):
     id: str = Field(default_factory=lambda: "acc_" + uuid.uuid4().hex[:10])
     label: str = ""
+    email: str = ""
+    """The muse.ai login behind the cookies; muse.ai never exposes it, so the admin enters it."""
     enabled: bool = True
     status: AccountStatus = AccountStatus.ACTIVE
 

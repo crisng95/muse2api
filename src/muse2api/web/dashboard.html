@@ -129,7 +129,7 @@ h2 .link { margin-left: auto; text-transform: none; letter-spacing: 0; font-weig
 .btn:disabled { opacity: .5; cursor: default; }
 a.link, button.link { color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: none; font-size: 12.5px; }
 a.link:hover, button.link:hover { text-decoration: underline; }
-input[type=text], input[type=password], select, textarea { background: var(--panel); border: 1px solid var(--border-strong); border-radius: 7px; padding: 6px 9px; min-width: 0; }
+input[type=text], input[type=email], input[type=password], select, textarea { background: var(--panel); border: 1px solid var(--border-strong); border-radius: 7px; padding: 6px 9px; min-width: 0; }
 input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible, tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
 label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; font-size: 13px; }
 .seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 7px; overflow: hidden; background: var(--panel); }
@@ -223,6 +223,8 @@ tr.builtin td:first-child b { font-family: var(--mono); font-size: 12.5px; }
 .acc-top { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px 8px 16px; }
 .acc-top .name { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .acc-top .id { color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+.acc-top .email { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acc-top .email.none { color: var(--faint); font-style: italic; }
 .acc-top .grow { flex: 1; min-width: 0; }
 .metrics { display: grid; grid-template-columns: repeat(3, 1fr); padding: 2px 14px 10px 16px; gap: 6px; }
 .metrics div { min-width: 0; }
@@ -549,7 +551,8 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
   function accountLabel(id) {
     if (!id) return "";
     const a = state.accounts.find((x) => x.id === id);
-    return a && a.label ? a.label : id;
+    if (!a) return id;
+    return [a.label || id, a.email].filter(Boolean).join(" · ");
   }
   function keyLabel(id, fallback) {
     if (!id) return fallback || "(không xác thực)";
@@ -736,6 +739,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
       <div class="acc-top">
         <div class="grow">
           <div class="name" title="${esc(name)}">${esc(name)}</div>
+          <div class="email${a.email ? "" : " none"}" title="${esc(a.email || "")}">${esc(a.email || "chưa có email")}</div>
           <div class="id">${esc(a.id)}</div>
         </div>
         <span class="badge ${s.badge}">${esc(s.label)}</span>
@@ -754,11 +758,24 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
       <div class="acc-actions">
         ${state.capabilities.renew_session ? `<button class="btn sm" type="button" data-act="renew">Gia hạn</button>` : ""}
         <button class="btn sm" type="button" data-act="reset" ${s.key === "active" && !a.last_error ? "disabled" : ""} title="Xoá cooldown và lỗi, đưa về trạng thái hoạt động">Đặt lại</button>
+        <button class="btn sm" type="button" data-act="edit">Sửa</button>
         <button class="btn sm ghost" type="button" data-act="requests">Requests</button>
         <span class="spacer"></span>
         <button class="btn sm danger" type="button" data-act="delete">Xoá</button>
       </div>
     </article>`;
+  }
+
+  async function accountForm(a) {
+    return modal({
+      title: `Sửa account ${a.label || a.id}`,
+      body: `<label class="f">Tên<input type="text" id="af-label" maxlength="100" value="${esc(a.label || "")}" placeholder="vd. acc1" autocomplete="off"></label>
+        <label class="f">Email <span class="hint">tài khoản muse.ai của bộ cookie này (muse.ai không cho đọc tự động)</span><input type="email" id="af-email" maxlength="254" value="${esc(a.email || "")}" placeholder="ten@gmail.com" autocomplete="off"></label>`,
+      actions: [{label: "Huỷ", value: null},
+        {label: "Lưu", primary: true, cls: "primary",
+         collect: () => ({label: $("#af-label").value.trim(), email: $("#af-email").value.trim()}),
+         check: (v) => !v.email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email) ? "" : "Email không hợp lệ."}],
+    });
   }
 
   function renderAccounts() {
@@ -797,7 +814,12 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     if (act === "requests") return go("requests", {account: id});
     guarded(async () => {
       const path = `/admin/accounts/${encodeURIComponent(id)}`;
-      if (act === "delete") {
+      if (act === "edit") {
+        const form = await accountForm(a || {id});
+        if (!form) return;
+        await api(path, {method: "PATCH", body: form});
+        toast("Đã cập nhật account");
+      } else if (act === "delete") {
         const name = a ? (a.label || a.id) : id;
         if (!await confirmBox("Xoá account?", `<p>Xoá vĩnh viễn <b>${esc(name)}</b> (<span class="mono">${esc(id)}</span>) khỏi pool, kể cả cookies đã lưu. Lịch sử request vẫn được giữ.</p>`, "Xoá account")) return;
         await api(path, {method: "DELETE"});
@@ -877,7 +899,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
       const cool = s.key === "quota" || s.key === "cooling";
       return `<div class="li click" data-goto="accounts" tabindex="0">
         <span class="dot ${s.cls}"></span>
-        <span class="lbl" title="${esc(a.label || a.id)}">${esc(a.label || a.id)}</span>
+        <span class="lbl" title="${esc([a.label || a.id, a.email].filter(Boolean).join(" · "))}">${esc(a.label || a.id)}${a.email ? ` <span class="muted">· ${esc(a.email)}</span>` : ""}</span>
         <span class="badge plain ${s.badge}">${esc(s.label)}${cool ? ` · <span class="mono" data-until="${esc(a.cooldown_until)}">${esc(countdown(a.cooldown_until - t))}</span>` : ""}</span>
         <span class="n" title="thành công / thất bại">${fmtNum(a.success_count)}<span class="muted">/</span><span class="${a.fail_count ? "e" : "muted"}" style="${a.fail_count ? "color:var(--err)" : ""}">${fmtNum(a.fail_count)}</span></span>
       </div>`;
@@ -1077,7 +1099,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     keySel.innerHTML = `<option value="">Mọi key</option><option value="legacy">legacy</option><option value="admin">admin</option>`
       + state.keys.map((k) => `<option value="${esc(k.id)}">${esc(k.name)}${k.revoked ? " (đã thu hồi)" : ""}</option>`).join("");
     accSel.innerHTML = `<option value="">Mọi account</option>`
-      + state.accounts.map((a) => `<option value="${esc(a.id)}">${esc(a.label || a.id)}</option>`).join("");
+      + state.accounts.map((a) => `<option value="${esc(a.id)}">${esc(accountLabel(a.id))}</option>`).join("");
     for (const [sel, val] of [[keySel, keyVal], [accSel, accVal]]) {
       sel.value = val;
       if (val && sel.value !== val) {
