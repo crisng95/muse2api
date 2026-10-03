@@ -49,6 +49,8 @@ class ApiKey(BaseModel):
     note: str = ""
     # Not charged for requests (see services/billing.py).
     unlimited: bool = False
+    # Whose wallet the key spends from (services/customers.py).
+    customer_id: str | None = None
 
     def public(self) -> dict:
         """Serialisable view without the hash."""
@@ -111,10 +113,11 @@ class KeyStore:
             key.last_used_at = now
             self._dirty = True
 
-    async def create(self, name: str, note: str = "") -> tuple[ApiKey, str]:
+    async def create(self, name: str, note: str = "",
+                     customer_id: str | None = None) -> tuple[ApiKey, str]:
         plaintext = generate_key()
         key = ApiKey(name=name, note=note, prefix=plaintext[:_DISPLAY_LEN],
-                     hash=hash_key(plaintext))
+                     hash=hash_key(plaintext), customer_id=customer_id)
         self._keys[key.id] = key
         await self.save()
         return key, plaintext

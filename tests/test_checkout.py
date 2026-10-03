@@ -19,7 +19,9 @@ from muse2api.app import create_app
 from muse2api.drivers.mock import MockDriver
 from muse2api.services import payments
 
-_INTERNAL = re.compile(r"cookie|muse\.ai|muse2api|browser|chromium|account", re.I)
+# Customers now have an account (/account); the upstream pool's accounts must not show.
+_INTERNAL = re.compile(r"cookie|muse\.ai|muse2api|browser|chromium|account[_ ]?ids?\b|"
+                       r"accounts\.json|account pool", re.I)
 
 
 class FakePayPal:

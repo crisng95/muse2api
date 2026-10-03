@@ -48,6 +48,12 @@ class TooManyRequests(Muse2APIError):
     code = "rate_limited"
 
 
+class Forbidden(Muse2APIError):
+    status_code = 403
+    error_type = "permission_error"
+    code = "forbidden"
+
+
 class NotFound(Muse2APIError):
     status_code = 404
     error_type = "invalid_request_error"

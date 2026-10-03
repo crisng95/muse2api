@@ -10,10 +10,18 @@ Creating an order also returns a secret claim token (only its hash is stored).
 The order id alone is not enough to capture: it shows up in PayPal's redirect
 URLs, and the capture call hands out a new customer's API key.
 
+Credit always goes to a customer's wallet (services/customers.py). Three modes:
+``wallet`` (signed in to the portal: that customer), ``topup`` (an API key was
+pasted: its customer) and ``new`` (an email: a new customer, email unverified, and
+a first key). ``new`` never attaches to an existing customer: if the email already
+belongs to one, the new customer gets no email (the purchase keeps it as contact
+info). Orders are accepted either way, so checkout does not reveal whether an email
+is registered.
+
 New customers get their API key when their payment completes. The plaintext is
 returned once, to the capture call that created the key; a key created from a
 webhook (the capture call never finished) is never shown, so that customer has
-to ask support for a replacement.
+to sign in or ask support for a replacement.
 
 Purchase status: ``pending`` -> ``completed``, or ``failed`` (declined, amount
 mismatch), ``refunded`` (refunded or reversed before it was credited) or
@@ -41,6 +49,7 @@ from ..auth.keys import KeyStore
 from ..config import Settings
 from ..errors import CheckoutUnavailable, InvalidRequest, NotFound, PaymentError, TooManyRequests
 from .billing import MICRO, Billing, _apply, _balance, _tx, usd
+from .customers import Customer, Customers
 from .paypal import PayPalClient
 
 log = logging.getLogger(__name__)
@@ -62,7 +71,7 @@ CREATE TABLE IF NOT EXISTS purchases (
 CREATE INDEX IF NOT EXISTS idx_purchases_created ON purchases (created_at);
 """
 # Columns added after the table first shipped; created on open when missing.
-_ADDED_COLUMNS = {"claim_hash": "TEXT"}
+_ADDED_COLUMNS = {"claim_hash": "TEXT", "customer_id": "TEXT"}
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _NAME_LEN = 100  # KeyCreate.name max length
@@ -159,31 +168,33 @@ def signature_headers_problem(headers: dict[str, str], now: float | None = None)
     return ""
 
 
-def _complete_tx(db: sqlite3.Connection, purchase: dict[str, Any], key_id: str,
-                 capture_id: str, payer_email: str | None, note: str) -> int | None:
-    """Mark the purchase completed and credit the key; None unless it was still pending."""
+def _complete_tx(db: sqlite3.Connection, purchase: dict[str, Any], customer_id: str,
+                 key_id: str | None, capture_id: str, payer_email: str | None,
+                 note: str) -> int | None:
+    """Mark the purchase completed and credit the wallet; None unless it was still pending."""
     status = db.execute("SELECT status FROM purchases WHERE id = ?", (purchase["id"],)).fetchone()[0]
     if status != "pending":
         return None
-    db.execute("UPDATE purchases SET status = 'completed', key_id = ?, capture_id = ?, "
-               "payer_email = ?, completed_at = ? WHERE id = ?",
-               (key_id, capture_id, payer_email, time.time(), purchase["id"]))
-    return _apply(db, key_id, purchase["amount_micro"], "topup", capture_id, note)
+    db.execute("UPDATE purchases SET status = 'completed', customer_id = ?, key_id = ?, "
+               "capture_id = ?, payer_email = ?, completed_at = ? WHERE id = ?",
+               (customer_id, key_id, capture_id, payer_email, time.time(), purchase["id"]))
+    return _apply(db, customer_id, None, purchase["amount_micro"], "topup", capture_id, note)
 
 
-def _debit_tx(db: sqlite3.Connection, key_id: str, amount: int, ref: str, note: str) -> bool:
+def _debit_tx(db: sqlite3.Connection, customer_id: str, amount: int, ref: str, note: str) -> bool:
     if db.execute("SELECT 1 FROM ledger WHERE ref = ? AND kind = 'adjust'", (ref,)).fetchone():
         return False
-    _apply(db, key_id, -amount, "adjust", ref, note)
+    _apply(db, customer_id, None, -amount, "adjust", ref, note)
     return True
 
 
 class Payments:
     def __init__(self, settings: Settings, keys: KeyStore, billing: Billing,
-                 paypal: PayPalClient) -> None:
+                 customers: Customers, paypal: PayPalClient) -> None:
         self.settings = settings
         self.keys = keys
         self.billing = billing
+        self.customers = customers
         self.paypal = paypal
         self._ready = False
         # Serialises the capture call and the webhook for one order.
@@ -205,6 +216,10 @@ class Payments:
             return fn(db, *args)
 
         return await self.billing._run(call)
+
+    async def open(self) -> None:
+        """Create or upgrade the purchases table (before the customer migration reads it)."""
+        await self._run(lambda db: None)
 
     def _require_enabled(self) -> None:
         if not self.settings.checkout_enabled:
@@ -231,8 +246,9 @@ class Payments:
 
     # ---- checkout ----
     async def create_order(self, amount_usd: float, email: str | None, api_key: str | None,
-                           ip: str) -> dict[str, str]:
-        """Validate a purchase, create its PayPal order and record it.
+                           ip: str, customer: Customer | None = None) -> dict[str, str]:
+        """Validate a purchase, create its PayPal order and record it. ``customer`` is
+        the signed-in portal customer, if any: their wallet is topped up.
         Returns the order id and the claim token that ``capture`` asks for."""
         s = self.settings
         self._require_enabled()
@@ -244,14 +260,17 @@ class Payments:
         if not s.topup_min_usd <= amount_usd <= s.topup_max_usd:
             raise InvalidRequest(f"amount_usd must be between ${s.topup_min_usd:g} "
                                  f"and ${s.topup_max_usd:g}")
-        api_key, email = (api_key or "").strip(), (email or "").strip()
-        if api_key:
+        api_key, email = (api_key or "").strip(), (email or "").strip().lower()
+        customer_id = None
+        if customer is not None:
+            mode, key_id, email, customer_id = "wallet", None, customer.email, customer.id
+        elif api_key:
             if api_key in {s.api_key, s.admin_key} - {""}:
                 raise InvalidRequest("this key cannot be topped up")
             key = self.keys.verify(api_key)
             if key is None:
                 raise InvalidRequest("unknown or revoked API key", code="invalid_api_key")
-            mode, key_id, email = "topup", key.id, None
+            mode, key_id, email, customer_id = "topup", key.id, None, key.customer_id
         else:
             if len(email) > 254 or not _EMAIL.match(email):
                 raise InvalidRequest("a valid email is required", code="invalid_email")
@@ -261,9 +280,10 @@ class Payments:
         order_id = await self.paypal.create_order(purchase_id, f"{cents / 100:.2f}")
         await self._run(lambda db: db.execute(
             "INSERT INTO purchases (id, paypal_order_id, amount_micro, mode, email, key_id, "
-            "status, created_at, claim_hash) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)",
+            "status, created_at, claim_hash, customer_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)",
             (purchase_id, order_id, cents * 10_000, mode, email, key_id, time.time(),
-             _hash(claim))))
+             _hash(claim), customer_id)))
         log.info("checkout %s: order %s, $%.2f, %s", purchase_id, order_id, cents / 100, mode)
         return {"id": order_id, "claim": claim}
 
@@ -312,25 +332,40 @@ class Payments:
 
     async def _complete(self, purchase: dict[str, Any], capture_id: str,
                         payer_email: str | None, *, reveal: bool) -> dict[str, Any]:
-        key_id, plaintext = purchase["key_id"], None
+        key_id, customer_id, plaintext = purchase["key_id"], purchase["customer_id"], None
+        new_customer = None
         if purchase["mode"] == "topup":
             key = self.keys.get(key_id)
-            if key is None or key.revoked:
+            if key is None or key.revoked or not key.customer_id:
                 # Paid, but crediting a dead key would strand the money: support decides.
                 await self._mark(purchase, "needs_support", capture_id)
                 log.error("purchase %s paid for revoked or deleted key %s", purchase["id"], key_id)
+                return dict(_NEEDS_SUPPORT)
+            customer_id = key.customer_id  # the key may have moved since the order
+        elif purchase["mode"] == "wallet":
+            if self.customers.get(customer_id) is None:
+                await self._mark(purchase, "needs_support", capture_id)
+                log.error("purchase %s paid for unknown customer %s", purchase["id"], customer_id)
                 return dict(_NEEDS_SUPPORT)
         else:
             if self.settings.paypal_env == "sandbox":
                 note = "sandbox"
             else:
                 note = "self-serve" if reveal else "self-serve (webhook)"
-            key, plaintext = await self.keys.create(purchase["email"][:_NAME_LEN], note)
+            email = purchase["email"]
+            # Never add a key to an existing customer's wallet by email.
+            taken = self.customers.by_email(email) is not None
+            try:
+                new_customer = await self.customers.create(None if taken else email, email)
+            except sqlite3.IntegrityError:  # registered meanwhile
+                new_customer = await self.customers.create(None, email)
+            customer_id = new_customer.id
+            key, plaintext = await self.keys.create(email[:_NAME_LEN], note, customer_id)
             key_id = key.id
         note = f"PayPal {purchase['paypal_order_id']} {payer_email or purchase['email'] or ''}".strip()
         try:
-            balance = await self._run(_tx, _complete_tx, purchase, key_id, capture_id,
-                                      payer_email, note)
+            balance = await self._run(_tx, _complete_tx, purchase, customer_id, key_id,
+                                      capture_id, payer_email, note)
         except BaseException:
             if plaintext:
                 await self.keys.remove(key_id)
@@ -350,7 +385,7 @@ class Payments:
         """Answer to a repeated capture, made with the right claim token."""
         if purchase["status"] != "completed":
             return {"status": purchase["status"]}
-        balance = await self._run(_balance, purchase["key_id"])
+        balance = await self._run(_balance, purchase["customer_id"])
         message = "this payment was already credited"
         if purchase["mode"] == "new":
             message += ("; the API key is shown only once, when the payment completes. "
@@ -416,7 +451,8 @@ class Payments:
             return
         async with self._locks.setdefault(purchase["paypal_order_id"], asyncio.Lock()):
             purchase = await self._get(purchase["paypal_order_id"])
-            if purchase["status"] != "completed" or not purchase["key_id"]:
+            customer_id = purchase["customer_id"] or self.billing.customer_of(purchase["key_id"])
+            if purchase["status"] != "completed" or not customer_id:
                 await self._mark(purchase, "refunded", capture_id)
                 log.warning("purchase %s (%s) %s before it was credited", purchase["id"],
                             purchase["status"], label)
@@ -426,13 +462,15 @@ class Payments:
             if not micro or micro < 0 or amount.get("currency_code") != "USD":
                 log.warning("ignored %s for capture %s (%s)", kind, capture_id, amount)
                 return
-            key_id = purchase["key_id"]
-            if await self._run(_tx, _debit_tx, key_id, micro, ref, f"PayPal {label} {capture_id}"):
-                log.info("PayPal %s: -$%s from %s", label, usd(micro), key_id)
+            if await self._run(_tx, _debit_tx, customer_id, micro, ref,
+                               f"PayPal {label} {capture_id}"):
+                log.info("PayPal %s: -$%s from %s", label, usd(micro), customer_id)
 
     # ---- admin ----
-    async def recent(self, limit: int = 100) -> list[dict[str, Any]]:
+    async def recent(self, limit: int = 100, customer_id: str | None = None) -> list[dict[str, Any]]:
+        where, args = ("WHERE customer_id = ?", (customer_id,)) if customer_id else ("", ())
         rows = await self._run(lambda db: db.execute(
-            "SELECT * FROM purchases ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall())
+            f"SELECT * FROM purchases {where} ORDER BY created_at DESC LIMIT ?",
+            (*args, limit)).fetchall())
         return [{**{k: r[k] for k in r.keys() if k not in ("amount_micro", "claim_hash")},
                  "amount_usd": usd(r["amount_micro"])} for r in rows]

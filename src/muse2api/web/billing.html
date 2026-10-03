@@ -56,6 +56,8 @@ svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor;
 .nav-links a { text-decoration: none; color: var(--muted); font-size: 14.5px; font-weight: 500; }
 .nav-links a:hover { color: var(--text); }
 .nav .spacer { flex: 1; }
+.nav .acct { color: var(--muted); font-size: 14.5px; font-weight: 500; text-decoration: none; white-space: nowrap; }
+.nav .acct:hover { color: var(--text); }
 .lang { position: relative; }
 .lang summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 9px; color: var(--muted); font-size: 14px; font-weight: 500; }
 .lang summary::-webkit-details-marker { display: none; }
@@ -120,6 +122,8 @@ legend, .label { display: block; font-weight: 700; font-size: 15px; margin-botto
 .note a, .msg a, .done a:not(.btn) { color: var(--accent-ink); }
 
 .sandbox { margin: 0 0 18px; padding: 10px 14px; border-radius: 10px; border: 2px dashed var(--warn-border); background: var(--warn-bg); color: var(--warn-text); font-size: 14.5px; }
+.signed { margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--accent-soft); color: var(--text); font-size: 14.5px; overflow-wrap: anywhere; }
+#signin-hint a { color: var(--accent-ink); }
 .msg { margin: 0 0 14px; padding: 11px 14px; border-radius: 10px; font-size: 14.5px; border: 1px solid var(--err-border); background: var(--err-bg); color: var(--err-text); }
 .msg.info { border-color: var(--border); background: var(--panel-2); color: var(--text); }
 .busy { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14.5px; margin-bottom: 14px; }
@@ -180,10 +184,11 @@ footer a { text-decoration: none; } footer a:hover { color: var(--text); }
     </nav>
     <span class="spacer"></span>
     {{lang_menu}}
+    <a class="acct" href="/account">{{nav.account}}</a>
   </div>
 </header>
 
-<main id="checkout" data-state="{{checkout.state}}" data-min="{{topup.min}}" data-max="{{topup.max}}"
+<main id="checkout" data-state="{{checkout.state}}" data-portal="{{portal.state}}" data-min="{{topup.min}}" data-max="{{topup.max}}"
       data-image="{{price.image}}" data-video="{{price.video_10s}}">
   <section class="head">
     <div class="wrap">
@@ -219,7 +224,8 @@ footer a { text-decoration: none; } footer a:hover { color: var(--text); }
           <p class="hint">{{billing.custom_hint}}</p>
         </fieldset>
 
-        <fieldset>
+        <p class="signed" id="signed-in" hidden></p>
+        <fieldset id="who">
           <legend>{{billing.mode_label}}</legend>
           <div class="modes">
             <label class="mode"><input type="radio" name="mode" value="new" checked>{{billing.mode_new}}</label>
@@ -235,6 +241,7 @@ footer a { text-decoration: none; } footer a:hover { color: var(--text); }
             <input id="apikey" class="mono" type="password" autocomplete="off" spellcheck="false" maxlength="200" placeholder="m2a-…">
             <p class="hint">{{billing.key_hint}}</p>
           </div>
+          <p class="hint" id="signin-hint" hidden>{{billing.sign_in_hint}}</p>
         </fieldset>
       </div>
 
@@ -283,6 +290,8 @@ footer a { text-decoration: none; } footer a:hover { color: var(--text); }
     <span data-k="err_key_unknown">{{billing.err_key_unknown}}</span>
     <span data-k="err_declined">{{billing.err_declined}}</span>
     <span data-k="err_rate">{{billing.err_rate}}</span>
+    <span data-k="err_email_taken">{{billing.err_email_taken}}</span>
+    <span data-k="signed_in_as">{{billing.signed_in_as}}</span>
     <span data-k="err_generic">{{billing.err_generic}}</span>
     <span data-k="err_cancel">{{billing.err_cancel}}</span>
     <span data-k="err_sdk">{{billing.err_sdk}}</span>
@@ -334,6 +343,7 @@ footer a { text-decoration: none; } footer a:hover { color: var(--text); }
     && Math.abs(state.amount * 100 - Math.round(state.amount * 100)) < 1e-6;
   const validEmail = (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
   function check() {
+    if (state.session) return validAmount() ? "" : T("err_amount");
     if (!validAmount()) return T("err_amount");
     if (state.mode === "new" && !validEmail($("#email").value.trim())) return T("err_email");
     if (state.mode === "topup" && !$("#apikey").value.trim().startsWith("m2a-")) return T("err_key");
@@ -360,16 +370,31 @@ footer a { text-decoration: none; } footer a:hover { color: var(--text); }
   $("#form").addEventListener("submit", (e) => e.preventDefault());
   update();
 
+  // Signed in to the portal: credit goes to that customer's wallet, no email or key.
+  if (root.dataset.portal === "on") {
+    $("#signin-hint").hidden = false;
+    fetch("/account/api/me", {credentials: "same-origin"}).then(r => r.ok ? r.json() : null).then(me => {
+      if (!me) return;
+      state.session = me;
+      $("#who").hidden = true;
+      const el = $("#signed-in");
+      el.textContent = $("#t [data-k=signed_in_as]").textContent.replace("{email}", me.customer.email || me.customer.name || "");
+      el.hidden = false;
+    }).catch(() => {});
+  }
+
   // ---- payment ----
   async function post(path, body) {
-    const r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
+    const headers = {"Content-Type": "application/json"};
+    if (state.session) headers["X-CSRF-Token"] = state.session.csrf;
+    const r = await fetch(path, {method: "POST", headers, credentials: "same-origin",
                                  body: JSON.stringify(body || {})});
     let data = {};
     try { data = await r.json(); } catch {}
     if (!r.ok) {
       const code = (data.error || {}).code;
       const known = {invalid_api_key: "err_key_unknown", invalid_email: "err_email", rate_limited: "err_rate",
-                     payment_declined: "err_declined"}[code];
+                     payment_declined: "err_declined", email_taken: "err_email_taken"}[code];
       const err = new Error(known ? T(known) : T("err_generic"));
       err.shown = true;
       throw err;
@@ -416,7 +441,8 @@ footer a { text-decoration: none; } footer a:hover { color: var(--text); }
       createOrder: async () => {
         lastError = "";
         const body = {amount_usd: state.amount};
-        if (state.mode === "new") body.email = $("#email").value.trim();
+        if (state.session) { /* the signed-in customer's wallet */ }
+        else if (state.mode === "new") body.email = $("#email").value.trim();
         else body.api_key = $("#apikey").value.trim();
         try {
           const order = await post("/billing/orders", body);

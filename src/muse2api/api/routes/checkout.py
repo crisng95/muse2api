@@ -5,7 +5,6 @@ No API key: a new customer has none yet, and a top-up names its key in the body.
 
 from __future__ import annotations
 
-import ipaddress
 import json
 
 from fastapi import APIRouter, Depends, Request
@@ -13,37 +12,26 @@ from fastapi import APIRouter, Depends, Request
 from ...errors import InvalidRequest
 from ...services.container import Services
 from ...services.payments import WEBHOOK_MAX_BYTES
-from ..deps import get_services
+from ..deps import billing_ip, get_services
 from ..schemas import CheckoutCapture, CheckoutOrder
+from .account import SESSION_COOKIE, check_csrf
 
 router = APIRouter(tags=["checkout"])
-
-
-def billing_ip(request: Request) -> str:
-    """Client address for rate limits. Cloudflare's header is trusted only when the
-    connection comes from this machine (the tunnel); any other forwarding header is
-    ignored, since a client could set it. IPv6 clients are bucketed by /64."""
-    peer = request.client.host if request.client else ""
-    ip = peer
-    try:
-        if ipaddress.ip_address(peer).is_loopback:
-            ip = request.headers.get("cf-connecting-ip", "").strip() or peer
-    except ValueError:
-        pass
-    try:
-        addr = ipaddress.ip_address(ip)
-    except ValueError:
-        return ip or "?"
-    if addr.version == 6:
-        return str(ipaddress.ip_network(f"{addr}/64", strict=False))
-    return str(addr)
 
 
 @router.post("/billing/orders")
 async def create_order(body: CheckoutOrder, request: Request,
                        svc: Services = Depends(get_services)) -> dict:
+    # Signed in to the portal: top up that customer's wallet (the cookie makes this
+    # a state change, hence the CSRF check). Signed out: the email or key decides.
+    customer = None
+    found = (await svc.customers.session(request.cookies.get(SESSION_COOKIE))
+             if svc.settings.portal_enabled else None)
+    if found is not None:
+        check_csrf(request, found[1], svc)
+        customer = found[0]
     return await svc.payments.create_order(body.amount_usd, body.email, body.api_key,
-                                           billing_ip(request))
+                                           billing_ip(request), customer)
 
 
 @router.post("/billing/orders/{order_id}/capture")

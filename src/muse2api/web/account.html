@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{account.meta.title}}</title>
+<meta name="description" content="{{account.meta.description}}">
+<meta name="robots" content="noindex">
+{{hreflang}}
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230b6b61%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f7f5; --panel: #ffffff; --panel-2: #eef1ed; --border: #e0e4dd; --border-strong: #c8cec4;
+  --text: #12171a; --muted: #566067; --faint: #889097;
+  --accent: #0b6b61; --accent-hover: #095a52; --accent-text: #ffffff; --accent-soft: #dcefeb; --accent-ink: #0a5f56;
+  --glow: rgba(47, 191, 171, .22);
+  --warn-bg: #fff6e5; --warn-border: #f0cf8f; --warn-text: #7a4b00;
+  --err-bg: #fdecec; --err-border: #f3b9b7; --err-text: #9b1c1c;
+  --ok-text: #11795a;
+  --shadow: 0 1px 2px rgba(17, 23, 26, .05), 0 8px 24px rgba(17, 23, 26, .05);
+  --sans: "Be Vietnam Pro", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0b0f11; --panel: #12181b; --panel-2: #182024; --border: #222b30; --border-strong: #34414a;
+    --text: #e4e9eb; --muted: #95a0a6; --faint: #6b777e;
+    --accent: #2fbfab; --accent-hover: #45d0bd; --accent-text: #04201c; --accent-soft: #10302c; --accent-ink: #4fd3c0;
+    --glow: rgba(47, 191, 171, .16);
+    --warn-bg: #2a2010; --warn-border: #5c4520; --warn-text: #f2c97a;
+    --err-bg: #2a1414; --err-border: #5c2a2a; --err-text: #f4a3a0;
+    --ok-text: #4fd3a0;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+svg { display: block; }
+a { color: inherit; }
+code, .mono { font-family: var(--mono); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+[hidden] { display: none !important; }
+.wrap { width: 100%; max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.nav { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); border-bottom: 1px solid var(--border); }
+.nav .wrap { display: flex; align-items: center; gap: 22px; height: 64px; }
+.brand { display: flex; align-items: center; gap: 10px; white-space: nowrap; text-decoration: none; font-weight: 700; font-size: 17px; letter-spacing: -.02em; }
+.glyph { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(140deg, #3fd1bd, #0b6b61); color: #04201c; font: 800 15px/1 var(--sans); }
+.nav-links { display: flex; gap: 22px; margin-left: 8px; }
+.nav-links a { text-decoration: none; color: var(--muted); font-size: 14.5px; font-weight: 500; }
+.nav-links a:hover { color: var(--text); }
+.nav .spacer { flex: 1; }
+.lang { position: relative; }
+.lang summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 9px; color: var(--muted); font-size: 14px; font-weight: 500; }
+.lang summary::-webkit-details-marker { display: none; }
+.lang summary:hover, .lang[open] summary { color: var(--text); background: var(--panel-2); }
+.lang ul { position: absolute; right: 0; top: calc(100% + 6px); min-width: 180px; margin: 0; padding: 6px; list-style: none; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 24px 60px rgba(10, 14, 16, .18); z-index: 60; }
+.lang li a { display: block; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-size: 14.5px; }
+.lang li a:hover { background: var(--panel-2); }
+.lang li a[aria-current="true"] { color: var(--accent-ink); font-weight: 600; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 16px; border-radius: 10px; font: 600 14.5px/1.2 var(--sans); text-decoration: none; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--panel-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.sm { padding: 6px 11px; font-size: 13.5px; border-radius: 8px; }
+.btn.danger { color: var(--err-text); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+main { padding: 32px 0 72px; min-height: 60vh; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 22px; min-width: 0; }
+.center { max-width: 520px; margin: 40px auto; text-align: center; }
+.center h1 { font-size: 28px; letter-spacing: -.03em; margin: 0 0 10px; }
+.center p { color: var(--muted); }
+.center .btn { margin: 10px 0 6px; padding: 12px 20px; font-size: 15.5px; }
+.small { font-size: 13.5px; color: var(--muted); }
+.small a, .card a:not(.btn) { color: var(--accent-ink); }
+.msg.ok { border-color: var(--border); background: var(--accent-soft); color: var(--text); }
+.claim { margin: 4px 0 16px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.msg { margin: 0 0 16px; padding: 11px 14px; border-radius: 10px; font-size: 14.5px; border: 1px solid var(--err-border); background: var(--err-bg); color: var(--err-text); }
+
+.top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.top h1 { margin: 0; font-size: 26px; letter-spacing: -.03em; }
+.top .who { color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.top .spacer { flex: 1; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; overflow-x: auto; }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 14px; font: 600 14.5px var(--sans); color: var(--muted); cursor: pointer; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--accent-ink); border-bottom-color: var(--accent); }
+
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 14px; }
+.tile .k { color: var(--muted); font-size: 13.5px; font-weight: 600; }
+.tile .v { font-size: 28px; font-weight: 800; letter-spacing: -.03em; line-height: 1.2; margin: 4px 0; }
+.tile .s { color: var(--muted); font-size: 13px; }
+.tile .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 9px; overflow: hidden; }
+.seg button { background: none; border: 0; padding: 6px 12px; font: 600 13px var(--sans); color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-ink); }
+.chart { display: flex; align-items: flex-end; gap: 3px; height: 140px; margin-top: 12px; }
+.chart div { flex: 1; min-width: 2px; background: var(--accent); border-radius: 3px 3px 0 0; opacity: .85; position: relative; }
+.chart div:hover { opacity: 1; }
+.chart-axis { display: flex; justify-content: space-between; color: var(--faint); font-size: 12px; margin-top: 6px; }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+h2 { font-size: 16px; margin: 0 0 10px; letter-spacing: -.01em; }
+
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; vertical-align: middle; }
+th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.trunc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+td.empty { text-align: center; color: var(--muted); padding: 22px; white-space: normal; }
+.badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 650; background: var(--panel-2); color: var(--muted); }
+.badge.ok { color: var(--ok-text); background: color-mix(in srgb, var(--ok-text) 12%, transparent); }
+.badge.err { color: var(--err-text); background: var(--err-bg); }
+.badge.warn { color: var(--warn-text); background: var(--warn-bg); }
+.actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+.newkey { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
+.newkey label { display: grid; gap: 4px; font-size: 13.5px; font-weight: 600; flex: 1 1 220px; }
+input[type=text], select { padding: 9px 12px; border-radius: 9px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); font: 14.5px var(--sans); }
+input[type=text]:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.reveal { border: 2px solid var(--accent); border-radius: 12px; padding: 14px; margin-bottom: 16px; background: var(--accent-soft); }
+.reveal .keybox { display: flex; gap: 10px; margin: 8px 0 10px; }
+.reveal code { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 9px; background: var(--panel); word-break: break-all; user-select: all; font-size: 14px; }
+.warnbox { padding: 10px 12px; border-radius: 9px; border: 1px solid var(--warn-border); background: var(--warn-bg); color: var(--warn-text); font-size: 14px; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.pager { display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 10px; color: var(--muted); font-size: 13px; }
+dialog { border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text); padding: 20px; width: min(420px, calc(100vw - 32px)); box-shadow: 0 24px 60px rgba(10, 14, 16, .3); }
+dialog::backdrop { background: rgba(0, 0, 0, .4); }
+dialog form { display: grid; gap: 12px; }
+dialog .row { display: flex; gap: 8px; justify-content: flex-end; }
+
+footer { padding: 0 0 40px; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; }
+footer nav { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; }
+footer a { text-decoration: none; } footer a:hover { color: var(--text); }
+
+@media (max-width: 860px) {
+  .grid, .two { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .wrap { padding: 0 16px; }
+  .nav-links { display: none; }
+  .lang summary span { display: none; }
+  .card { padding: 16px; }
+  .reveal .keybox { flex-direction: column; }
+  footer nav { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</svg>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="glyph" aria-hidden="true">M</span>Muse API</a>
+    <nav class="nav-links" aria-label="{{common.nav.label}}">
+      <a href="/#pricing">{{common.nav.pricing}}</a>
+      <a href="/docs">{{common.nav.docs}}</a>
+      <a href="/billing">{{account.top_up}}</a>
+    </nav>
+    <span class="spacer"></span>
+    {{lang_menu}}
+  </div>
+</header>
+
+<main id="portal" data-state="{{portal.state}}">
+  <div class="wrap">
+    <div class="card center" id="disabled" hidden>
+      <h1>{{account.disabled_title}}</h1>
+      <p>{{account.disabled_text}}</p>
+    </div>
+
+    <div class="card center" id="signin" hidden>
+      <div class="msg" id="login-failed" hidden>{{account.login_failed}}</div>
+      <h1>{{account.signin_title}}</h1>
+      <p>{{account.signin_text}}</p>
+      <a class="btn primary" href="/account/login">{{account.signin_button}}</a>
+      <p class="small">{{account.signin_note}}</p>
+    </div>
+
+    <div id="app" hidden>
+      <div class="top">
+        <div>
+          <h1 id="name"></h1>
+          <div class="who">{{account.signed_in_as}} <b id="email"></b></div>
+        </div>
+        <span class="spacer"></span>
+        <button class="btn" type="button" id="signout">{{account.sign_out}}</button>
+      </div>
+      <div class="msg" id="error" role="alert" hidden>{{account.error}}</div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="overview" aria-selected="true">{{account.tab_overview}}</button>
+        <button type="button" role="tab" data-tab="keys" aria-selected="false">{{account.tab_keys}}</button>
+        <button type="button" role="tab" data-tab="requests" aria-selected="false">{{account.tab_requests}}</button>
+        <button type="button" role="tab" data-tab="billing" aria-selected="false">{{account.tab_billing}}</button>
+      </div>
+
+      <section data-pane="overview">
+        <div class="grid">
+          <div class="card tile">
+            <div class="k">{{account.balance}}</div>
+            <div class="v" id="balance">–</div>
+            <div class="row"><span class="s">{{account.balance_note}}</span><a class="btn primary sm" href="/billing">{{account.top_up}}</a></div>
+          </div>
+          <div class="card tile"><div class="k">{{account.spend}}</div><div class="v" id="t-spend">–</div><div class="s" id="t-period"></div></div>
+          <div class="card tile"><div class="k">{{account.requests}}</div><div class="v" id="t-requests">–</div><div class="s" id="t-period2"></div></div>
+        </div>
+        <div class="card" style="margin-bottom: 14px;">
+          <div class="tile"><div class="row">
+            <h2 style="margin: 0;">{{account.spend}}</h2>
+            <span class="seg"><button type="button" data-days="7" aria-pressed="true">{{account.days_7}}</button><button type="button" data-days="30" aria-pressed="false">{{account.days_30}}</button></span>
+          </div></div>
+          <div class="chart" id="chart"></div>
+          <div class="chart-axis"><span id="axis-from"></span><span id="axis-to"></span></div>
+        </div>
+        <div class="two">
+          <div class="card"><h2>{{account.by_model}}</h2><div class="tablewrap"><table>
+            <thead><tr><th>{{account.col_model}}</th><th class="num">{{account.requests}}</th><th class="num">{{account.col_cost}}</th></tr></thead>
+            <tbody id="by-model"></tbody></table></div></div>
+          <div class="card"><h2>{{account.by_key}}</h2><div class="tablewrap"><table>
+            <thead><tr><th>{{account.col_key}}</th><th class="num">{{account.requests}}</th><th class="num">{{account.col_errors}}</th><th class="num">{{account.col_cost}}</th></tr></thead>
+            <tbody id="by-key"></tbody></table></div></div>
+        </div>
+      </section>
+
+      <section data-pane="keys" hidden>
+        <div class="card">
+          <p class="small" style="margin-top: 0;">{{account.keys_text}}</p>
+          <form class="newkey" id="newkey-form">
+            <label>{{account.key_name}}<input type="text" id="newkey-name" maxlength="100" placeholder="{{account.key_name_ph}}" required></label>
+            <button class="btn primary" type="submit"><svg class="i"><use href="#i-plus"/></svg>{{account.new_key}}</button>
+          </form>
+          <form class="newkey claim" id="claim-form">
+            <label>{{account.claim_text}}<input type="password" id="claim-key" class="mono" maxlength="200" placeholder="m2a-…" autocomplete="off" spellcheck="false" required></label>
+            <button class="btn" type="submit">{{account.claim_button}}</button>
+          </form>
+          <div class="msg" id="claim-msg" role="status" hidden></div>
+          <div class="reveal" id="reveal" hidden>
+            <b>{{account.new_key_title}}</b>
+            <div class="keybox"><code id="reveal-key"></code><button class="btn primary" type="button" id="copy"><svg class="i"><use href="#i-copy"/></svg><span>{{common.copy}}</span></button></div>
+            <div class="warnbox">{{account.new_key_warning}}</div>
+          </div>
+          <div class="tablewrap"><table>
+            <thead><tr><th>{{account.col_name}}</th><th>{{account.col_key}}</th><th>{{account.col_created}}</th><th>{{account.col_last_used}}</th><th class="num">{{account.spend}}</th><th>{{account.col_status}}</th><th></th></tr></thead>
+            <tbody id="keys"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <section data-pane="requests" hidden>
+        <div class="card">
+          <div class="filters">
+            <select id="f-key" aria-label="{{account.col_key}}"></select>
+            <select id="f-status" aria-label="{{account.col_status}}">
+              <option value="">{{account.all_status}}</option>
+              <option value="2xx">{{account.status_ok}}</option>
+              <option value="failed">{{account.status_failed}}</option>
+            </select>
+          </div>
+          <div class="tablewrap"><table>
+            <thead><tr><th>{{account.col_time}}</th><th>{{account.col_endpoint}}</th><th>{{account.col_model}}</th><th>{{account.col_key}}</th><th>{{account.col_status}}</th><th class="num">{{account.col_latency}}</th><th class="num">{{account.col_cost}}</th></tr></thead>
+            <tbody id="requests"></tbody>
+          </table></div>
+          <div class="pager"><span id="range"></span><button class="btn sm" type="button" id="prev">{{account.newer}}</button><button class="btn sm" type="button" id="next">{{account.older}}</button></div>
+        </div>
+      </section>
+
+      <section data-pane="billing" hidden>
+        <div class="card" style="margin-bottom: 14px;">
+          <h2>{{account.payments}}</h2>
+          <div class="tablewrap"><table>
+            <thead><tr><th>{{account.col_time}}</th><th class="num">{{account.col_amount}}</th><th>{{account.col_status}}</th><th>{{account.col_reference}}</th></tr></thead>
+            <tbody id="purchases"></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <h2>{{account.adjustments}}</h2>
+          <div class="tablewrap"><table>
+            <thead><tr><th>{{account.col_time}}</th><th>{{account.col_type}}</th><th class="num">{{account.col_amount}}</th><th class="num">{{account.col_balance_after}}</th></tr></thead>
+            <tbody id="ledger"></tbody>
+          </table></div>
+        </div>
+      </section>
+      <p class="small" style="margin-top: 18px;">{{account.help}}</p>
+    </div>
+  </div>
+
+  <dialog id="rename">
+    <form method="dialog">
+      <label><b>{{account.rename}}</b><br><input type="text" id="rename-name" maxlength="100" required style="width: 100%; margin-top: 6px;"></label>
+      <div class="row"><button class="btn" value="cancel" formnovalidate>{{account.cancel}}</button><button class="btn primary" value="ok">{{account.save}}</button></div>
+    </form>
+  </dialog>
+
+  <div hidden id="t">
+    <span data-k="revoke_confirm">{{account.revoke_confirm}}</span>
+    <span data-k="unlimited">{{account.unlimited}}</span>
+    <span data-k="days_7">{{account.days_7}}</span>
+    <span data-k="days_30">{{account.days_30}}</span>
+    <span data-k="no_usage">{{account.no_usage}}</span>
+    <span data-k="no_keys">{{account.no_keys}}</span>
+    <span data-k="no_requests">{{account.no_requests}}</span>
+    <span data-k="no_billing">{{account.no_billing}}</span>
+    <span data-k="rename">{{account.rename}}</span>
+    <span data-k="revoke">{{account.revoke}}</span>
+    <span data-k="active">{{account.active}}</span>
+    <span data-k="revoked">{{account.revoked}}</span>
+    <span data-k="never">{{account.never}}</span>
+    <span data-k="all_keys">{{account.all_keys}}</span>
+    <span data-k="err_400">{{account.err_400}}</span>
+    <span data-k="err_401">{{account.err_401}}</span>
+    <span data-k="err_402">{{account.err_402}}</span>
+    <span data-k="err_404">{{account.err_404}}</span>
+    <span data-k="err_429">{{account.err_429}}</span>
+    <span data-k="err_5xx">{{account.err_5xx}}</span>
+    <span data-k="task_failed">{{account.task_failed}}</span>
+    <span data-k="task_running">{{account.task_running}}</span>
+    <span data-k="kind_topup">{{account.kind_topup}}</span>
+    <span data-k="kind_refund">{{account.kind_refund}}</span>
+    <span data-k="kind_adjust">{{account.kind_adjust}}</span>
+    <span data-k="purchase_completed">{{account.purchase_completed}}</span>
+    <span data-k="purchase_failed">{{account.purchase_failed}}</span>
+    <span data-k="purchase_refunded">{{account.purchase_refunded}}</span>
+    <span data-k="purchase_needs_support">{{account.purchase_needs_support}}</span>
+    <span data-k="copied">{{common.copied}}</span>
+    <span data-k="claim_done">{{account.claim_done}}</span>
+    <span data-k="claim_failed">{{account.claim_failed}}</span>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© <span id="year">2026</span> ISEMI</span>
+    <nav aria-label="{{common.footer.label}}">
+      <a href="/">{{common.nav.home}}</a>
+      <a href="/docs">{{common.nav.docs}}</a>
+      <a href="mailto:{{support_email}}">{{common.footer.support}}</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => [...document.querySelectorAll(s)];
+  const T = (k) => { const el = $(`#t [data-k="${k}"]`); return el ? el.innerHTML : ""; };
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const money = (v) => v == null ? "–" : (v < 0 ? "−$" : "$")
+    + Math.abs(v).toFixed(Math.abs(v) >= 1 || v === 0 ? 2 : Math.abs(v) >= 0.01 ? 4 : 6);
+  const when = (ts) => ts ? new Date(ts * 1000).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : T("never");
+  const day = (ts) => new Date(ts * 1000).toLocaleDateString([], {month: "short", day: "numeric"});
+  const state = {csrf: "", days: 7, offset: 0, limit: 50, keys: []};
+  $("#year").textContent = new Date().getFullYear();
+  document.querySelectorAll(".lang a").forEach(a => a.addEventListener("click", () => { a.href += location.hash; }));
+
+  const root = $("#portal");
+  if (root.dataset.state !== "on") { $("#disabled").hidden = false; return; }
+
+  async function api(path, opts = {}) {
+    const headers = {"Accept": "application/json"};
+    if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+    if (opts.method && opts.method !== "GET") headers["X-CSRF-Token"] = state.csrf;
+    const r = await fetch(path, {method: opts.method || "GET", headers, credentials: "same-origin",
+                                 body: opts.body === undefined ? undefined : JSON.stringify(opts.body)});
+    if (r.status === 401) { showSignIn(); throw new Error("signed out"); }
+    if (!r.ok) throw new Error(String(r.status));
+    return r.json();
+  }
+  const guard = (fn) => async (...args) => {
+    try { $("#error").hidden = true; await fn(...args); }
+    catch (e) { if (e.message !== "signed out") $("#error").hidden = false; }
+  };
+  function showSignIn() {
+    $("#app").hidden = true; $("#signin").hidden = false;
+    $("#login-failed").hidden = new URLSearchParams(location.search).get("login") !== "failed";
+  }
+
+  // A failed request is explained by its status only (never by server error text).
+  function statusText(r) {
+    if (r.task_status === "failed" || r.task_status === "cancelled") return `<span class="badge err">${T("task_failed")}</span>`;
+    const c = r.status_code;
+    if (c < 400) return r.task && !r.task_status ? `<span class="badge">${T("task_running")}</span>` : `<span class="badge ok">${c}</span>`;
+    const key = c >= 500 ? "err_5xx" : ({400: "err_400", 401: "err_401", 402: "err_402", 404: "err_404", 429: "err_429"}[c] || "err_400");
+    return `<span class="badge err" title="${c}">${T(key)}</span>`;
+  }
+
+  // ---- tabs ----
+  function show(tab) {
+    $$(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
+    $$("[data-pane]").forEach(p => { p.hidden = p.dataset.pane !== tab; });
+    history.replaceState(null, "", `#${tab}`);
+    ({overview: loadOverview, keys: loadKeys, requests: loadRequests, billing: loadBilling}[tab])();
+  }
+  $$(".tabs button").forEach(b => b.addEventListener("click", () => show(b.dataset.tab)));
+
+  // ---- overview ----
+  const loadOverview = guard(async () => {
+    const [me, u] = await Promise.all([api("/account/api/me"), api(`/account/api/usage?days=${state.days}`)]);
+    $("#balance").textContent = me.customer.unlimited ? T("unlimited") : money(me.balance_usd);
+    const spend = u.series.reduce((s, d) => s + d.cost_usd, 0), reqs = u.series.reduce((s, d) => s + d.requests, 0);
+    $("#t-spend").textContent = money(spend);
+    $("#t-requests").textContent = reqs.toLocaleString();
+    $("#t-period").textContent = $("#t-period2").textContent = T(state.days === 7 ? "days_7" : "days_30");
+    const max = Math.max(...u.series.map(d => d.cost_usd), 0);
+    $("#chart").innerHTML = u.series.map(d => `<div style="height:${max ? Math.max(2, d.cost_usd / max * 100) : 2}%" title="${esc(day(d.t))}: ${esc(money(d.cost_usd))} · ${d.requests}"></div>`).join("");
+    $("#axis-from").textContent = day(u.series[0].t);
+    $("#axis-to").textContent = day(u.series[u.series.length - 1].t);
+    const empty = (n) => `<tr><td colspan="${n}" class="empty">${T("no_usage")}</td></tr>`;
+    $("#by-model").innerHTML = u.by_model.map(r => `<tr><td>${esc(r.model || "–")}</td><td class="num">${r.requests}</td><td class="num">${esc(money(r.cost_usd))}</td></tr>`).join("") || empty(3);
+    $("#by-key").innerHTML = u.by_key.map(r => `<tr><td class="trunc">${esc(r.key_name || "–")}</td><td class="num">${r.requests}</td><td class="num">${r.errors || 0}</td><td class="num">${esc(money(r.cost_usd))}</td></tr>`).join("") || empty(4);
+  });
+  $$(".seg button").forEach(b => b.addEventListener("click", () => {
+    state.days = Number(b.dataset.days);
+    $$(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    loadOverview();
+  }));
+
+  // ---- keys ----
+  const loadKeys = guard(async () => {
+    const res = await api("/account/api/keys");
+    state.keys = res.data;
+    $("#keys").innerHTML = res.data.map(k => `<tr data-id="${esc(k.id)}">
+      <td class="trunc"><b>${esc(k.name)}</b></td><td class="mono">${esc(k.prefix)}…</td>
+      <td>${esc(when(k.created_at))}</td><td>${esc(when(k.last_used_at))}</td>
+      <td class="num">${esc(money(k.spend_usd))}</td>
+      <td><span class="badge ${k.revoked ? "err" : "ok"}">${T(k.revoked ? "revoked" : "active")}</span></td>
+      <td><div class="actions">${k.revoked ? "" : `<button class="btn sm" type="button" data-act="rename">${T("rename")}</button><button class="btn sm danger" type="button" data-act="revoke">${T("revoke")}</button>`}</div></td>
+    </tr>`).join("") || `<tr><td colspan="7" class="empty">${T("no_keys")}</td></tr>`;
+  });
+  $("#newkey-form").addEventListener("submit", guard(async (e) => {
+    e.preventDefault();
+    const name = $("#newkey-name").value.trim();
+    if (!name) return;
+    const res = await api("/account/api/keys", {method: "POST", body: {name} });
+    $("#newkey-name").value = "";
+    $("#reveal").hidden = false;
+    $("#reveal-key").textContent = res.api_key;
+    await loadKeys();
+  }));
+  $("#claim-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const api_key = $("#claim-key").value.trim();
+    if (!api_key) return;
+    const msg = $("#claim-msg");
+    try {
+      await api("/account/api/keys/claim", {method: "POST", body: {api_key} });
+      $("#claim-key").value = "";
+      msg.className = "msg ok"; msg.innerHTML = T("claim_done");
+      await loadKeys();
+    } catch (err) {
+      if (err.message === "signed out") return;
+      msg.className = "msg"; msg.innerHTML = T("claim_failed");
+    }
+    msg.hidden = false;
+  });
+  $("#copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("#reveal-key").textContent); $("#copy span").textContent = T("copied"); } catch {}
+  });
+  $("#keys").addEventListener("click", guard(async (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const id = btn.closest("tr").dataset.id;
+    const key = state.keys.find(k => k.id === id);
+    if (btn.dataset.act === "revoke") {
+      if (!confirm($("#t [data-k=revoke_confirm]").textContent)) return;
+      await api(`/account/api/keys/${encodeURIComponent(id)}/revoke`, {method: "POST", body: {} });
+    } else {
+      const dlg = $("#rename");
+      $("#rename-name").value = key ? key.name : "";
+      dlg.showModal();
+      await new Promise(r => dlg.addEventListener("close", r, {once: true}));
+      const name = $("#rename-name").value.trim();
+      if (dlg.returnValue !== "ok" || !name) return;
+      await api(`/account/api/keys/${encodeURIComponent(id)}`, {method: "PATCH", body: {name} });
+    }
+    await loadKeys();
+  }));
+
+  // ---- requests ----
+  const loadRequests = guard(async () => {
+    if (!state.keys.length) state.keys = (await api("/account/api/keys")).data;
+    const sel = $("#f-key"), current = sel.value;
+    sel.innerHTML = `<option value="">${T("all_keys")}</option>` + state.keys.map(k => `<option value="${esc(k.id)}">${esc(k.name)}</option>`).join("");
+    sel.value = current;
+    const p = new URLSearchParams({limit: state.limit, offset: state.offset});
+    if (sel.value) p.set("key_id", sel.value);
+    if ($("#f-status").value) p.set("status", $("#f-status").value);
+    const res = await api(`/account/api/requests?${p}`);
+    $("#requests").innerHTML = res.data.map(r => `<tr>
+      <td>${esc(when(r.ts))}</td><td class="mono trunc">${esc(r.method)} ${esc(r.path)}</td>
+      <td>${esc(r.model || "–")}</td><td class="trunc">${esc(r.key_name || "–")}</td>
+      <td>${statusText(r)}</td><td class="num">${r.latency_ms < 1000 ? r.latency_ms + " ms" : (r.latency_ms / 1000).toFixed(1) + " s"}</td>
+      <td class="num">${esc(money(r.cost_usd))}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">${T("no_requests")}</td></tr>`;
+    const end = state.offset + res.data.length;
+    $("#range").textContent = res.total ? `${state.offset + 1}–${end} / ${res.total}` : "";
+    $("#prev").disabled = state.offset === 0;
+    $("#next").disabled = end >= res.total;
+  });
+  for (const id of ["#f-key", "#f-status"]) $(id).addEventListener("change", () => { state.offset = 0; loadRequests(); });
+  $("#prev").addEventListener("click", () => { state.offset = Math.max(0, state.offset - state.limit); loadRequests(); });
+  $("#next").addEventListener("click", () => { state.offset += state.limit; loadRequests(); });
+
+  // ---- billing ----
+  const loadBilling = guard(async () => {
+    const res = await api("/account/api/billing");
+    const pclass = {completed: "ok", failed: "err", refunded: "warn", needs_support: "warn"};
+    $("#purchases").innerHTML = res.purchases.map(p => `<tr><td>${esc(when(p.completed_at || p.created_at))}</td>
+      <td class="num">${esc(money(p.amount_usd))}</td>
+      <td><span class="badge ${pclass[p.status] || ""}">${T("purchase_" + p.status) || esc(p.status)}</span></td>
+      <td class="mono">${esc(p.paypal_order_id)}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">${T("no_billing")}</td></tr>`;
+    $("#ledger").innerHTML = res.ledger.map(e => `<tr><td>${esc(when(e.ts))}</td><td>${T("kind_" + e.kind)}</td>
+      <td class="num">${esc((e.amount_usd > 0 ? "+" : "") + money(e.amount_usd))}</td><td class="num">${esc(money(e.balance_after_usd))}</td></tr>`).join("")
+      || `<tr><td colspan="4" class="empty">${T("no_billing")}</td></tr>`;
+  });
+
+  $("#signout").addEventListener("click", guard(async () => {
+    await api("/account/logout", {method: "POST", body: {} });
+    location.href = "/";
+  }));
+
+  // ---- start ----
+  (async () => {
+    try {
+      const me = await api("/account/api/me");
+      state.csrf = me.csrf;
+      $("#name").textContent = me.customer.name || me.customer.email || "";
+      $("#email").textContent = me.customer.email || "";
+      $("#app").hidden = false;
+      const tab = location.hash.slice(1);
+      show(["overview", "keys", "requests", "billing"].includes(tab) ? tab : "overview");
+    } catch (e) {
+      if (e.message !== "signed out") { showSignIn(); }
+    }
+  })();
+})();
+</script>
+</body>
+</html>

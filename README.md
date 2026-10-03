@@ -288,6 +288,9 @@ All settings come from environment variables (prefix `MUSE2API_`) or a `.env` fi
 | `MUSE2API_PAYPAL_ALLOW_SANDBOX` | `false` | Allow checkout in `sandbox` (fake payments, real credit — testing only) |
 | `MUSE2API_PAYPAL_WEBHOOK_ID` | empty | ID of the webhook pointing at `/billing/paypal/webhook`; empty ignores webhooks |
 | `MUSE2API_TOPUP_MIN_USD` · `MUSE2API_TOPUP_MAX_USD` | `5` · `1000` | Allowed checkout amount range |
+| `MUSE2API_GOOGLE_CLIENT_ID` · `MUSE2API_GOOGLE_CLIENT_SECRET` | empty | Google OAuth web client for the customer portal at `/account`; empty disables it |
+| `MUSE2API_GOOGLE_REDIRECT_URI` | derived | Exact redirect URI registered at Google (default `<public base>/account/auth/google/callback`) |
+| `MUSE2API_SESSION_DAYS` | `30` | Portal sign-in session lifetime |
 
 ## Roadmap
 

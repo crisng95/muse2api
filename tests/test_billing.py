@@ -311,7 +311,9 @@ def test_admin_credit_and_ledger(client, admin, auth):
     key_id, _ = _key(client, admin)
     r = client.post(f"/admin/keys/{key_id}/credit", headers=admin,
                     json={"amount_usd": 10, "note": "invoice #12"})
-    assert r.json() == {"key_id": key_id, "kind": "topup", "amount_usd": 10.0, "balance_usd": 10.0}
+    customer_id = client.get("/admin/keys", headers=admin).json()["data"][0]["customer_id"]
+    assert r.json() == {"key_id": key_id, "customer_id": customer_id, "kind": "topup",
+                        "amount_usd": 10.0, "balance_usd": 10.0}
     r = client.post(f"/admin/keys/{key_id}/credit", headers=admin, json={"amount_usd": -2.5})
     assert r.json()["kind"] == "adjust" and r.json()["balance_usd"] == 7.5
     assert client.post(f"/admin/keys/{key_id}/credit", headers=admin,

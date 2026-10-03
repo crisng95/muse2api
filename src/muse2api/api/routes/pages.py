@@ -1,7 +1,8 @@
 """HTML pages under ``web/``.
 
-``/`` (landing page with models and pricing), ``/docs`` (API reference) and
-``/billing`` (self-serve PayPal checkout) are for customers. They are templates: ``{{key}}`` placeholders are filled from
+``/`` (landing page with models and pricing), ``/docs`` (API reference),
+``/billing`` (self-serve PayPal checkout) and ``/account`` (customer portal, see
+routes/account.py) are for customers. They are templates: ``{{key}}`` placeholders are filled from
 ``web/i18n/<lang>.json`` (missing keys fall back to English) and from the live
 prices in ``Settings``, so the page always quotes what billing charges.
 
@@ -25,6 +26,7 @@ from fastapi.responses import HTMLResponse
 
 from ...config import Settings
 from ..deps import get_services, public_base
+from .account import SESSION_COOKIE
 
 router = APIRouter(tags=["pages"])
 
@@ -137,7 +139,8 @@ def _lang_menu(lang: str, names: dict[str, str], label: str) -> str:
             f"</summary><ul>{items}</ul></details>")
 
 
-def render(name: str, lang: str, settings: Settings, base: str, path: str) -> str:
+def render(name: str, lang: str, settings: Settings, base: str, path: str,
+           signed_in: bool = False) -> str:
     names = {code: strings(code)["_language"] for code in LANGUAGES}
     values = {
         **strings(lang),
@@ -145,6 +148,9 @@ def render(name: str, lang: str, settings: Settings, base: str, path: str) -> st
         **checkout_vars(settings),
         "lang": lang,
         "support_email": SUPPORT_EMAIL,
+        "portal.state": "on" if settings.portal_enabled else "off",
+        # Only a hint for the nav label; the portal itself checks the session.
+        "nav.account": "{{common.nav.account}}" if signed_in else "{{common.nav.sign_in}}",
         "base_code": '<code><span class="base">https://muse.isemi.io</span>/v1</code>',
         "lang_menu": _lang_menu(lang, names, strings(lang)["common.language"]),
         # base comes from the Host header unless public_base is set: escape it.
@@ -174,7 +180,8 @@ def _localized(name: str, request: Request, headers: dict[str, str] = _HEADERS) 
     settings = get_services(request).settings
     lang = pick_language(request)
     base = public_base(request)
-    resp = HTMLResponse(render(name, lang, settings, base, request.url.path),
+    signed_in = bool(request.cookies.get(SESSION_COOKIE))
+    resp = HTMLResponse(render(name, lang, settings, base, request.url.path, signed_in),
                         headers={**headers, "Vary": "Accept-Language, Cookie",
                                  "Content-Language": lang})
     if request.query_params.get("lang") == lang:
@@ -195,6 +202,11 @@ async def docs(request: Request) -> HTMLResponse:
 @router.get("/billing", response_class=HTMLResponse, include_in_schema=False)
 async def billing(request: Request) -> HTMLResponse:
     return _localized("billing.html", request, _CHECKOUT_HEADERS)
+
+
+@router.get("/account", response_class=HTMLResponse, include_in_schema=False)
+async def account(request: Request) -> HTMLResponse:
+    return _localized("account.html", request)
 
 
 @router.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)

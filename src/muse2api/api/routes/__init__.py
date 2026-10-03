@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from . import (
+    account,
     admin,
     balance,
     chat,
@@ -18,6 +19,6 @@ from . import (
 def build_router() -> APIRouter:
     router = APIRouter()
     for module in (health, models, chat, responses, images, videos, balance, media, admin,
-                   checkout, pages):
+                   checkout, account, pages):
         router.include_router(module.router)
     return router

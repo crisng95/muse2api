@@ -231,11 +231,15 @@ class RequestLog:
     async def query(self, *, key_id: str | None = None, account_id: str | None = None,
                     status: str | None = None, path: str | None = None,
                     since: float | None = None, hide_polls: bool = False,
+                    key_ids: list[str] | None = None,
                     limit: int = 100, offset: int = 0) -> dict[str, Any]:
         where, args = ["1=1"], []
         if key_id:
             where.append("key_id = ?")
             args.append(key_id)
+        if key_ids is not None:  # one customer's keys; an empty list matches nothing
+            where.append(f"key_id IN ({', '.join('?' * len(key_ids))})" if key_ids else "0")
+            args += key_ids
         if account_id:
             where.append("account_id = ?")
             args.append(account_id)
@@ -328,6 +332,36 @@ class RequestLog:
                 "by_status": grouped(db, "status_code"),
                 "series": series,
             }
+
+        return await asyncio.to_thread(self._call, run)
+
+    async def usage(self, key_ids: list[str], days: int) -> dict[str, Any]:
+        """Requests and charged cost of some keys per UTC day, by model and by key
+        (task polls left out), for the customer portal."""
+        day = 86400
+        start = (time.time() // day - days + 1) * day
+        if not key_ids:
+            key_ids = [""]
+        cond = (f"ts >= ? AND poll = 0 AND key_id IN ({', '.join('?' * len(key_ids))})")
+        args = (start, *key_ids)
+
+        def run(db: sqlite3.Connection) -> dict[str, Any]:
+            series = [{"t": start + i * day, "requests": 0, "cost_micro": 0} for i in range(days)]
+            for idx, n, cost in db.execute(
+                    f"SELECT CAST((ts - ?) / ? AS INTEGER) AS b, COUNT(*), "
+                    f"COALESCE(SUM(cost_micro), 0) FROM requests WHERE {cond} GROUP BY b",
+                    (start, day, *args)):
+                if 0 <= idx < days:
+                    series[idx]["requests"], series[idx]["cost_micro"] = n, cost
+
+            def grouped(col: str) -> list[dict[str, Any]]:
+                return [dict(r) for r in db.execute(
+                    f"SELECT {col}, COUNT(*) AS requests, SUM({FAILED}) AS errors, "
+                    f"COALESCE(SUM(cost_micro), 0) AS cost_micro FROM requests WHERE {cond} "
+                    f"GROUP BY {col} ORDER BY cost_micro DESC, requests DESC", args)]
+
+            return {"since": start, "series": series, "by_model": grouped("model"),
+                    "by_key": grouped("key_id")}
 
         return await asyncio.to_thread(self._call, run)
 

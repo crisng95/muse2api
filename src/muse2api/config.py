@@ -104,6 +104,15 @@ class Settings(BaseSettings):
     topup_min_usd: float = 5.0
     topup_max_usd: float = 1000.0
 
+    # --- customer portal (/account, Google sign-in) ---
+    # The portal is off (a friendly page explains) until both are set.
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = Field(
+        default="", description="Exact redirect URI registered at Google. Empty derives "
+        "<public base>/account/auth/google/callback from public_base or the request.")
+    session_days: float = 30
+
     # --- keepalive (session renewal) ---
     keepalive_enabled: bool = False
     keepalive_interval: float = 6 * 3600
@@ -161,6 +170,10 @@ class Settings(BaseSettings):
         # Sandbox payments are fake money, so they need an explicit opt-in.
         return bool(self.paypal_client_id and self.paypal_client_secret) and (
             self.paypal_env == "live" or self.paypal_allow_sandbox)
+
+    @property
+    def portal_enabled(self) -> bool:
+        return bool(self.google_client_id and self.google_client_secret)
 
     @property
     def effective_admin_key(self) -> str:

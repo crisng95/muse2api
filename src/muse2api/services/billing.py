@@ -1,13 +1,14 @@
-"""Prepaid USD credit per stored client key.
+"""Prepaid USD credit: one wallet per customer, shared by all of its keys.
 
 Money is integer micro-USD (1e-6 USD) internally and a USD float rounded to six
-decimals in APIs. Balances and the ledger live in ``data/requests.db`` on the
+decimals in APIs. Wallets and the ledger live in ``data/requests.db`` on the
 request log's connection, in their own tables, which retention pruning never
-touches. Every balance change is one transaction: the balance update plus its
-ledger row.
+touches. Every balance change is one transaction: the wallet update plus its
+ledger row, which records the customer and, for spending, the key that spent.
 
-Only stored keys are billed; the admin key, the legacy ``api_key`` and keys marked
-``unlimited`` are not, and nothing is when ``billing_enabled`` is off. Responses
+Only stored keys are billed, from their customer's wallet (see services/customers.py);
+the admin key, the legacy ``api_key`` and keys or customers marked ``unlimited``
+are not, and nothing is when ``billing_enabled`` is off. Responses
 still carry ``cost_usd`` (the request's price) for those, for information only;
 the request log's ``cost_micro`` holds what was actually charged.
 
@@ -37,33 +38,74 @@ log = logging.getLogger(__name__)
 
 MICRO = 1_000_000
 
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS balances (
-    key_id        TEXT    PRIMARY KEY,
-    balance_micro INTEGER NOT NULL DEFAULT 0,
-    updated_at    REAL    NOT NULL
-);
-CREATE TABLE IF NOT EXISTS ledger (
+_LEDGER = """
+CREATE TABLE ledger (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     ts            REAL    NOT NULL,
-    key_id        TEXT    NOT NULL,
+    customer_id   TEXT,
+    key_id        TEXT,
     amount_micro  INTEGER NOT NULL,
     kind          TEXT    NOT NULL,
     ref           TEXT,
     note          TEXT,
     balance_after INTEGER NOT NULL
+)"""
+
+_SCHEMA = f"""
+CREATE TABLE IF NOT EXISTS wallets (
+    customer_id   TEXT    PRIMARY KEY,
+    balance_micro INTEGER NOT NULL DEFAULT 0,
+    updated_at    REAL    NOT NULL
 );
+{_LEDGER.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS")};
+CREATE INDEX IF NOT EXISTS idx_ledger_customer ON ledger (customer_id, id);
 CREATE INDEX IF NOT EXISTS idx_ledger_key ON ledger (key_id, id);
 CREATE INDEX IF NOT EXISTS idx_ledger_ref ON ledger (ref);
 -- A charge is refunded at most once.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_refund ON ledger (ref) WHERE kind = 'refund';
 -- Up-front charges whose work has neither succeeded nor been refunded yet.
 CREATE TABLE IF NOT EXISTS reservations (
-    ref    TEXT PRIMARY KEY,
-    key_id TEXT NOT NULL,
-    ts     REAL NOT NULL
+    ref         TEXT PRIMARY KEY,
+    key_id      TEXT NOT NULL,
+    ts          REAL NOT NULL,
+    customer_id TEXT
 );
 """
+
+
+def _columns(db: sqlite3.Connection, table: str) -> set[str]:
+    return {r[1] for r in db.execute(f"PRAGMA table_info({table})")}
+
+
+def _upgrade(db: sqlite3.Connection) -> None:
+    """Bring tables from the per-key release up to the per-customer schema (once)."""
+    if _columns(db, "ledger") and "customer_id" not in _columns(db, "ledger"):
+        # key_id becomes nullable (wallet top-ups name no key), so rebuild the table;
+        # the old indexes go first or the new ones would be skipped as existing.
+        script = f"""
+            BEGIN IMMEDIATE;
+            DROP INDEX IF EXISTS idx_ledger_key;
+            DROP INDEX IF EXISTS idx_ledger_ref;
+            DROP INDEX IF EXISTS idx_ledger_refund;
+            ALTER TABLE ledger RENAME TO ledger_v1;
+            {_LEDGER};
+            INSERT INTO ledger (id, ts, customer_id, key_id, amount_micro, kind, ref, note,
+                                balance_after)
+                SELECT id, ts, NULL, key_id, amount_micro, kind, ref, note, balance_after
+                FROM ledger_v1;
+            DROP TABLE ledger_v1;
+            COMMIT;
+        """
+        try:
+            db.executescript(script)
+        except sqlite3.Error:
+            try:
+                db.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+            raise
+    if _columns(db, "reservations") and "customer_id" not in _columns(db, "reservations"):
+        db.execute("ALTER TABLE reservations ADD COLUMN customer_id TEXT")
 
 # Task outcomes that cost nothing.
 REFUNDABLE = (TaskStatus.FAILED, TaskStatus.CANCELLED)
@@ -89,23 +131,25 @@ def _note_cost(delta: int) -> None:
         record["cost_micro"] = (record.get("cost_micro") or 0) + delta
 
 
-def _balance(db: sqlite3.Connection, key_id: str) -> int:
-    row = db.execute("SELECT balance_micro FROM balances WHERE key_id = ?", (key_id,)).fetchone()
+def _balance(db: sqlite3.Connection, customer_id: str | None) -> int:
+    row = db.execute("SELECT balance_micro FROM wallets WHERE customer_id = ?",
+                     (customer_id,)).fetchone()
     return row[0] if row else 0
 
 
-def _apply(db: sqlite3.Connection, key_id: str, amount: int, kind: str,
+def _apply(db: sqlite3.Connection, customer_id: str, key_id: str | None, amount: int, kind: str,
            ref: str | None, note: str) -> int:
-    """Change a balance and write its ledger row; call inside ``_tx``. Returns the new balance."""
+    """Change a wallet and write its ledger row; call inside ``_tx``. Returns the new balance."""
     now = time.time()
     db.execute(
-        "INSERT INTO balances (key_id, balance_micro, updated_at) VALUES (?, ?, ?) "
-        "ON CONFLICT (key_id) DO UPDATE SET balance_micro = balance_micro + excluded.balance_micro, "
-        "updated_at = excluded.updated_at", (key_id, amount, now))
-    after = _balance(db, key_id)
+        "INSERT INTO wallets (customer_id, balance_micro, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT (customer_id) DO UPDATE SET "
+        "balance_micro = balance_micro + excluded.balance_micro, updated_at = excluded.updated_at",
+        (customer_id, amount, now))
+    after = _balance(db, customer_id)
     db.execute(
-        "INSERT INTO ledger (ts, key_id, amount_micro, kind, ref, note, balance_after) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)", (now, key_id, amount, kind, ref, note, after))
+        "INSERT INTO ledger (ts, customer_id, key_id, amount_micro, kind, ref, note, balance_after) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (now, customer_id, key_id, amount, kind, ref, note, after))
     return after
 
 
@@ -129,17 +173,17 @@ def _tx(db: sqlite3.Connection, fn, *args):
 
 def _refund(db: sqlite3.Connection, ref: str) -> int:
     db.execute("DELETE FROM reservations WHERE ref = ?", (ref,))
-    row = db.execute("SELECT key_id, SUM(amount_micro) FROM ledger "
-                     "WHERE ref = ? AND kind = 'charge' GROUP BY key_id", (ref,)).fetchone()
-    if row is None or db.execute("SELECT 1 FROM ledger WHERE ref = ? AND kind = 'refund'",
-                                 (ref,)).fetchone():
+    row = db.execute("SELECT customer_id, key_id, SUM(amount_micro) FROM ledger "
+                     "WHERE ref = ? AND kind = 'charge' GROUP BY customer_id", (ref,)).fetchone()
+    if row is None or row[0] is None or db.execute(
+            "SELECT 1 FROM ledger WHERE ref = ? AND kind = 'refund'", (ref,)).fetchone():
         return 0
-    _apply(db, row[0], -row[1], "refund", ref, "")
-    return -row[1]
+    _apply(db, row[0], row[1], -row[2], "refund", ref, "")
+    return -row[2]
 
 
-def _entry(r: sqlite3.Row) -> dict[str, Any]:
-    return {"id": r["id"], "ts": r["ts"], "key_id": r["key_id"],
+def entry(r: sqlite3.Row) -> dict[str, Any]:
+    return {"id": r["id"], "ts": r["ts"], "customer_id": r["customer_id"], "key_id": r["key_id"],
             "amount_usd": usd(r["amount_micro"]), "kind": r["kind"], "ref": r["ref"],
             "note": r["note"], "balance_after_usd": usd(r["balance_after"])}
 
@@ -149,6 +193,7 @@ class Billing:
         self.settings = settings
         self.keys = keys
         self.requests = requests
+        self.customers: Any = None  # services.customers.Customers, wired by the container
         self._ready = False
         # Balance changes that must finish even if the request that started them is gone.
         self._pending: set[asyncio.Task] = set()
@@ -171,12 +216,20 @@ class Billing:
         if not self.settings.billing_enabled or not key_id:
             return False
         key = self.keys.get(key_id)  # None for the admin and legacy identities
-        return key is not None and not key.unlimited
+        if key is None or key.unlimited:
+            return False
+        customer = self.customers.get(key.customer_id) if self.customers else None
+        return not (customer and customer.unlimited)
+
+    def customer_of(self, key_id: str | None) -> str | None:
+        key = self.keys.get(key_id) if key_id else None
+        return key.customer_id if key else None
 
     # ---- plumbing ----
     async def _run(self, fn, *args):
         def call(db: sqlite3.Connection):
             if not self._ready:
+                _upgrade(db)
                 db.executescript(_SCHEMA)
                 self._ready = True
             return fn(db, *args)
@@ -201,16 +254,18 @@ class Billing:
         balance does not cover it. Returns whether anything was charged."""
         if not self.billed(key_id):
             return False
+        customer_id = self.customer_of(key_id)
 
         def run(db: sqlite3.Connection) -> None:
-            balance = _balance(db, key_id)
-            if balance < amount:
+            # A key without a customer has an empty wallet: it fails closed.
+            balance = _balance(db, customer_id)
+            if customer_id is None or balance < amount:
                 raise InsufficientBalance(
                     f"insufficient balance: this request costs ${usd(amount):.6f}, "
                     f"balance is ${usd(balance):.6f}; top up to continue")
-            _apply(db, key_id, -amount, "charge", ref, note)
-            db.execute("INSERT INTO reservations (ref, key_id, ts) VALUES (?, ?, ?)",
-                       (ref, key_id, time.time()))
+            _apply(db, customer_id, key_id, -amount, "charge", ref, note)
+            db.execute("INSERT INTO reservations (ref, key_id, ts, customer_id) VALUES (?, ?, ?, ?)",
+                       (ref, key_id, time.time(), customer_id))
 
         await self._run(_tx, run)
         _note_cost(amount)
@@ -220,7 +275,7 @@ class Billing:
         """Gate for requests priced afterwards (chat): reject only an empty balance."""
         if not self.billed(key_id):
             return
-        balance = await self.balance(key_id)
+        balance = await self.balance(self.customer_of(key_id))
         if balance <= 0:
             raise InsufficientBalance(
                 f"insufficient balance: balance is ${usd(balance):.6f}; top up to continue")
@@ -230,12 +285,16 @@ class Billing:
         """Charge an amount known after the fact; never raises, may go below zero."""
         if amount <= 0 or not self.billed(key_id):
             return
+        customer_id = self.customer_of(key_id)
+        if customer_id is None:
+            log.error("key %s has no customer; chat charge of %s lost", key_id, amount)
+            return
         # Noted first: the request-log row may be written while the charge is in flight.
         _note_cost(amount)
 
         async def run() -> None:
             try:
-                await self._run(_tx, _apply, key_id, -amount, "charge", ref, note)
+                await self._run(_tx, _apply, customer_id, key_id, -amount, "charge", ref, note)
             except Exception:  # noqa: BLE001
                 log.exception("failed to charge %s for %s", key_id, ref)
 
@@ -298,21 +357,38 @@ class Billing:
             log.info("refunded %d reservation(s) left by a restart", done)
         return done
 
-    # ---- admin ----
-    async def credit(self, key_id: str, amount: int, note: str = "") -> int:
-        """Top up (positive) or adjust (negative) a balance; returns the new balance."""
+    # ---- wallets ----
+    async def credit(self, customer_id: str, amount: int, note: str = "") -> int:
+        """Top up (positive) or adjust (negative) a wallet; returns the new balance."""
         kind = "topup" if amount > 0 else "adjust"
-        return await self._run(_tx, _apply, key_id, amount, kind, None, note)
+        return await self._run(_tx, _apply, customer_id, None, amount, kind, None, note)
 
-    async def balance(self, key_id: str) -> int:
-        return await self._run(_balance, key_id)
+    async def balance(self, customer_id: str | None) -> int:
+        return await self._run(_balance, customer_id)
 
     async def balances(self) -> dict[str, int]:
         return dict(await self._run(
-            lambda db: db.execute("SELECT key_id, balance_micro FROM balances").fetchall()))
+            lambda db: db.execute("SELECT customer_id, balance_micro FROM wallets").fetchall()))
 
-    async def ledger(self, key_id: str, limit: int = 100) -> list[dict[str, Any]]:
+    async def ledger(self, customer_id: str, limit: int = 100,
+                     kinds: tuple[str, ...] | None = None) -> list[dict[str, Any]]:
+        """A wallet's changes, newest first; ``kinds`` narrows them (e.g. no charges)."""
+        where, args = "customer_id = ?", [customer_id]
+        if kinds:
+            where += f" AND kind IN ({', '.join('?' * len(kinds))})"
+            args += kinds
         rows = await self._run(lambda db: db.execute(
-            "SELECT * FROM ledger WHERE key_id = ? ORDER BY id DESC LIMIT ?",
-            (key_id, limit)).fetchall())
-        return [_entry(r) for r in rows]
+            f"SELECT * FROM ledger WHERE {where} ORDER BY id DESC LIMIT ?",
+            (*args, limit)).fetchall())
+        return [entry(r) for r in rows]
+
+    async def spend(self, customer_id: str | None = None) -> dict[str | None, int]:
+        """Net amount spent (charges less refunds): per key of one customer, or per
+        customer when ``customer_id`` is None."""
+        group = "key_id" if customer_id else "customer_id"
+        where = "AND customer_id = ?" if customer_id else ""
+        rows = await self._run(lambda db: db.execute(
+            f"SELECT {group}, -SUM(amount_micro) FROM ledger "
+            f"WHERE kind IN ('charge', 'refund') {where} GROUP BY {group}",
+            (customer_id,) if customer_id else ()).fetchall())
+        return dict(rows)

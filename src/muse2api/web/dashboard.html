@@ -325,6 +325,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-overview" viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="9" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5" rx="1.5"/><rect x="13.5" y="11" width="7.5" height="10" rx="1.5"/><rect x="3" y="15" width="7.5" height="6" rx="1.5"/></symbol>
   <symbol id="i-accounts" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18.5 14.8c1.7.7 2.7 2.4 3 5.2"/></symbol>
+  <symbol id="i-customers" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/></symbol>
   <symbol id="i-keys" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4.5"/><path d="M11.2 11.8 20 3M16.5 6.5l2.5 2.5M14 9l2 2"/></symbol>
   <symbol id="i-requests" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/><circle cx="19" cy="12" r="1.2"/></symbol>
   <symbol id="i-logout" viewBox="0 0 24 24"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l-4-4 4-4M6 12h10"/></symbol>
@@ -363,6 +364,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
       <div class="navlabel">Quản lý</div>
       <a href="#overview" data-page="overview"><svg class="i"><use href="#i-overview"/></svg>Tổng quan</a>
       <a href="#accounts" data-page="accounts"><svg class="i"><use href="#i-accounts"/></svg>Accounts<span class="count" id="nav-accounts"></span></a>
+      <a href="#customers" data-page="customers"><svg class="i"><use href="#i-customers"/></svg>Khách hàng<span class="count" id="nav-customers"></span></a>
       <a href="#keys" data-page="keys"><svg class="i"><use href="#i-keys"/></svg>API Keys<span class="count" id="nav-keys"></span></a>
       <a href="#requests" data-page="requests"><svg class="i"><use href="#i-requests"/></svg>Requests</a>
     </nav>
@@ -423,6 +425,21 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
       </section>
 
       <!-- keys -->
+      <section class="page" id="page-customers" hidden>
+        <div class="page-head">
+          <div class="grow"><h1>Khách hàng</h1><div class="sub">Mỗi khách có <b>một ví credit chung</b> cho mọi key của họ. Khách đăng nhập bằng Google tại <span class="mono">/account</span>; khách mua qua <span class="mono">/billing</span> được tạo tự động.</div></div>
+        </div>
+        <div class="tiles" id="cust-tiles" style="margin-bottom: 12px;"></div>
+        <div class="panel">
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Khách</th><th class="num">Số dư ví</th><th class="num">Keys</th><th class="num">Đã chi</th><th class="hide-sm">Tạo lúc</th><th></th></tr></thead>
+              <tbody id="cust-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section class="page" id="page-keys" hidden>
         <div class="page-head">
           <div class="grow"><h1>API Keys</h1><div class="sub">Key cho client gọi <span class="mono">/v1/*</span>. Server chỉ lưu bản băm — key chỉ hiển thị một lần khi cấp.</div></div>
@@ -507,7 +524,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
   const STORE = "muse2api.adminKey";
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-  const PAGES = {overview: "Tổng quan", accounts: "Accounts", keys: "API Keys", requests: "Requests"};
+  const PAGES = {overview: "Tổng quan", accounts: "Accounts", customers: "Khách hàng", keys: "API Keys", requests: "Requests"};
   const state = {
     page: "overview", window: "24h", offset: 0, limit: 50,
     accounts: [], keys: [], builtin: [], capabilities: {}, timer: null, modalOpen: false,
@@ -1011,8 +1028,10 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     const sum = (f) => all.reduce((s, u) => s + (u[f] || 0), 0);
     const active = state.keys.filter((k) => !k.revoked).length;
     const req24 = sum("requests_24h"), err24 = sum("errors_24h");
-    const billed = state.keys.filter((k) => !k.unlimited);
-    const credit = billed.reduce((s, k) => s + (k.balance_usd || 0), 0);
+    const billed = state.keys.filter((k) => !k.unlimited && !(k.customer && k.customer.unlimited));
+    // Keys of one customer share a wallet: count each wallet once.
+    const wallets = new Map(billed.map((k) => [k.customer_id || k.id, k.balance_usd || 0]));
+    const credit = [...wallets.values()].reduce((s, v) => s + v, 0);
     $("#key-tiles").innerHTML = [
       tile("Keys hoạt động", fmtNum(active), `${fmtNum(state.keys.length - active)} đã thu hồi`),
       tile("Tổng số dư", fmtUsd(credit), `${fmtNum(billed.length)} key tính phí`),
@@ -1021,7 +1040,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     ].join("");
     const statusBadgeK = (k) => k.revoked ? `<span class="badge b-err">đã thu hồi</span>` : `<span class="badge b-ok">hoạt động</span>`;
     const rows = state.keys.map((k) => `<tr class="click" data-id="${esc(k.id)}" tabindex="0" title="Xem requests của ${esc(k.name)}">
-        <td class="cell-name"><div><b>${esc(k.name)}</b>${k.note ? `<div class="sub" title="${esc(k.note)}">${esc(k.note)}</div>` : ""}</div><span class="m-status">${statusBadgeK(k)}</span></td>
+        <td class="cell-name"><div><b>${esc(k.name)}</b>${k.customer ? `<div class="sub">Khách: ${esc(k.customer.email || k.customer.name || k.customer.id)}</div>` : ""}${k.note ? `<div class="sub" title="${esc(k.note)}">${esc(k.note)}</div>` : ""}</div><span class="m-status">${statusBadgeK(k)}</span></td>
         <td class="mono hide-sm" data-label="Key">${esc(k.prefix)}…</td>
         <td class="cell-status" data-label="Status">${statusBadgeK(k)}</td>
         <td class="num" data-label="Số dư"><span class="bal${!k.unlimited && k.balance_usd <= 0 ? " neg" : ""}">${k.unlimited ? `<span class="badge b-info">Không giới hạn</span>` : esc(fmtUsd(k.balance_usd))}
@@ -1055,8 +1074,8 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     const res = await api("/admin/purchases?limit=50");
     $("#purchases-body").innerHTML = res.data.map((p) => {
       const [cls, label] = PURCHASE_STATUS[p.status] || ["b-mute", p.status];
-      const who = p.mode === "new" ? (p.email || "") : (p.key_name || p.key_id || "");
-      const sub = p.mode === "new" ? (p.key_name ? "key mới đã cấp" : "khách mới") : "nạp thêm cho key";
+      const who = p.mode === "topup" ? (p.key_name || p.key_id || "") : (p.email || p.customer_id || "");
+      const sub = {new: p.key_name ? "khách mới, đã cấp key" : "khách mới", wallet: "nạp ví (đã đăng nhập)"}[p.mode] || "nạp qua key";
       return `<tr><td class="mono" title="${esc(fullTime(p.created_at))}">${esc(ago(p.created_at))}</td>
         <td><div><b>${esc(who)}</b><div class="sub" title="${esc(p.payer_email || "")}">${esc(sub)}${p.payer_email && p.payer_email !== p.email ? ` · PayPal: ${esc(p.payer_email)}` : ""}</div></div></td>
         <td class="num">${esc(fmtUsd(p.amount_usd))}</td>
@@ -1106,7 +1125,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
   async function creditForm(k) {
     return modal({
       title: `Nạp credit cho “${k.name}”`,
-      body: `<p>Số dư hiện tại: <b class="mono">${esc(fmtUsd(k.balance_usd))}</b>${k.unlimited ? " — key đang <b>Không giới hạn</b>, sẽ không bị trừ tiền cho tới khi tắt." : ""}</p>
+      body: `<p>Credit vào <b>ví chung của khách hàng</b> (mọi key của khách dùng chung). Số dư ví hiện tại: <b class="mono">${esc(fmtUsd(k.balance_usd))}</b>${k.unlimited ? " — đang <b>Không giới hạn</b>, sẽ không bị trừ tiền cho tới khi tắt." : ""}</p>
         <label class="f">Số tiền (USD) <span class="hint">số âm = điều chỉnh giảm</span><input type="number" id="cf-amount" step="0.01" placeholder="vd. 10" autocomplete="off"></label>
         <label class="f">Ghi chú <span class="hint">không bắt buộc — vd. số hoá đơn, chuyển khoản</span><input type="text" id="cf-note" maxlength="500" autocomplete="off"></label>`,
       actions: [{label: "Huỷ", value: null},
@@ -1116,24 +1135,87 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     });
   }
   const LEDGER_KIND = {topup: ["b-ok", "Nạp"], charge: ["b-mute", "Trừ"], refund: ["b-info", "Hoàn"], adjust: ["b-warn", "Điều chỉnh"]};
-  async function showLedger(k) {
-    const res = await api(`/admin/keys/${encodeURIComponent(k.id)}/ledger?limit=200`);
+  async function showLedger(k, url = `/admin/keys/${encodeURIComponent(k.id)}/ledger`) {
+    const res = await api(`${url}?limit=200`);
     const rows = res.data.map((e) => {
       const [cls, label] = LEDGER_KIND[e.kind] || ["b-mute", e.kind];
       return `<tr><td class="mono" title="${esc(fullTime(e.ts))}">${esc(ago(e.ts))}</td>
         <td><span class="badge ${cls}">${esc(label)}</span></td>
         <td class="num${e.amount_usd < 0 ? "" : " pos"}">${esc((e.amount_usd > 0 ? "+" : "") + fmtUsd(e.amount_usd))}</td>
         <td class="num">${esc(fmtUsd(e.balance_after_usd))}</td>
+        <td class="trunc muted">${esc(e.key_id ? keyLabel(e.key_id, e.key_id) : "–")}</td>
         <td class="mono trunc muted" title="${esc(e.ref || "")}">${esc(e.ref || "")}</td>
         <td class="trunc" title="${esc(e.note || "")}">${esc(e.note || "")}</td></tr>`;
-    }).join("") || `<tr><td colspan="6" class="empty">Chưa có giao dịch nào.</td></tr>`;
+    }).join("") || `<tr><td colspan="7" class="empty">Chưa có giao dịch nào.</td></tr>`;
     await modal({
       title: `Lịch sử số dư — ${k.name}`, wide: true,
       body: `<p>Số dư: <b class="mono">${esc(fmtUsd(k.balance_usd))}</b>${k.unlimited ? ` · <span class="badge b-info">Không giới hạn</span>` : ""}. Mới nhất ở trên, tối đa 200 dòng.</p>
-        <div class="tablewrap"><table><thead><tr><th>Time</th><th>Loại</th><th class="num">Số tiền</th><th class="num">Số dư sau</th><th>Ref</th><th>Ghi chú</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+        <div class="tablewrap"><table><thead><tr><th>Time</th><th>Loại</th><th class="num">Số tiền</th><th class="num">Số dư sau</th><th>Key</th><th>Ref</th><th>Ghi chú</th></tr></thead><tbody>${rows}</tbody></table></div>`,
       actions: [{label: "Đóng", value: null, primary: true, cls: "primary"}],
     });
   }
+
+  // ---- customers ----
+  async function loadCustomers() {
+    const res = await api("/admin/customers");
+    state.customers = res.data;
+    $("#nav-customers").textContent = res.data.length || "";
+    const billed = res.data.filter((c) => !c.unlimited);
+    $("#cust-tiles").innerHTML = [
+      tile("Khách hàng", fmtNum(res.data.length), `${fmtNum(res.data.filter((c) => c.google_linked).length)} đã đăng nhập Google`),
+      tile("Tổng số dư ví", fmtUsd(billed.reduce((s, c) => s + c.balance_usd, 0)), `${fmtNum(billed.length)} khách tính phí`),
+      tile("Tổng đã chi", fmtUsd(res.data.reduce((s, c) => s + c.spend_usd, 0)), "trừ phần đã hoàn"),
+    ].join("");
+    $("#cust-body").innerHTML = res.data.map((c) => `<tr data-id="${esc(c.id)}">
+        <td><div><b>${esc(c.email || c.name || c.id)}</b>${c.email && c.name && c.name !== c.email ? ` <span class="muted">${esc(c.name)}</span>` : ""}
+          <div class="sub">${c.google_linked ? "Google ✓" : c.email ? "email chưa xác minh" : "không có email"} · <span class="mono">${esc(c.id)}</span></div></div></td>
+        <td class="num"><span class="bal${!c.unlimited && c.balance_usd <= 0 ? " neg" : ""}">${c.unlimited ? `<span class="badge b-info">Không giới hạn</span>` : esc(fmtUsd(c.balance_usd))}
+          <label class="switch" title="Không giới hạn (không tính phí) cho mọi key của khách"><input type="checkbox" data-act="unlimited" ${c.unlimited ? "checked" : ""} aria-label="Không giới hạn cho ${esc(c.email || c.name)}"><span></span></label></span></td>
+        <td class="num">${fmtNum(c.keys.filter((k) => !k.revoked).length)}${c.keys.some((k) => k.revoked) ? ` <span class="muted">(+${c.keys.filter((k) => k.revoked).length} thu hồi)</span>` : ""}</td>
+        <td class="num">${esc(fmtUsd(c.spend_usd))}</td>
+        <td class="hide-sm" title="${esc(fullTime(c.created_at))}">${esc(ago(c.created_at))}</td>
+        <td class="actions"><div class="row">
+          <button class="btn sm primary" type="button" data-act="credit">Nạp credit</button>
+          <button class="btn sm" type="button" data-act="ledger">Lịch sử</button>
+          <button class="btn sm" type="button" data-act="keys">Keys</button>
+        </div></td></tr>`).join("") || `<tr><td colspan="6" class="empty">Chưa có khách hàng nào.</td></tr>`;
+  }
+  $("#cust-body").addEventListener("change", (e) => {
+    const input = e.target.closest("input[data-act=unlimited]");
+    if (!input) return;
+    const id = input.closest("tr[data-id]").dataset.id;
+    guarded(async () => {
+      await api(`/admin/customers/${encodeURIComponent(id)}`, {method: "PATCH", body: {unlimited: input.checked}});
+      toast(input.checked ? "Khách không giới hạn — không tính phí" : "Khách bắt đầu bị tính phí");
+      await loadCustomers();
+    });
+  });
+  $("#cust-body").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-act]");
+    if (!btn) return;
+    const c = (state.customers || []).find((x) => x.id === btn.closest("tr[data-id]").dataset.id);
+    if (!c) return;
+    const label = c.email || c.name || c.id;
+    const path = `/admin/customers/${encodeURIComponent(c.id)}`;
+    guarded(async () => {
+      if (btn.dataset.act === "credit") {
+        const form = await creditForm({name: label, balance_usd: c.balance_usd, unlimited: c.unlimited});
+        if (!form) return;
+        const res = await api(`${path}/credit`, {method: "POST", body: form});
+        toast(`${res.kind === "topup" ? "Đã nạp" : "Đã điều chỉnh"} ${fmtUsd(res.amount_usd)} — số dư ${fmtUsd(res.balance_usd)}`);
+        await loadCustomers();
+      } else if (btn.dataset.act === "ledger") {
+        await showLedger({name: label, balance_usd: c.balance_usd, unlimited: c.unlimited}, `${path}/ledger`);
+      } else {
+        const rows = c.keys.map((k) => `<tr><td><b>${esc(k.name)}</b></td><td class="mono">${esc(k.prefix)}…</td>
+          <td>${k.revoked ? `<span class="badge b-err">đã thu hồi</span>` : `<span class="badge b-ok">hoạt động</span>`}${k.unlimited ? ` <span class="badge b-info">không giới hạn</span>` : ""}</td>
+          <td>${esc(k.last_used_at ? ago(k.last_used_at) : "chưa dùng")}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">Chưa có key.</td></tr>`;
+        await modal({title: `Keys của ${label}`, wide: true,
+          body: `<div class="tablewrap"><table><thead><tr><th>Tên</th><th>Key</th><th>Trạng thái</th><th>Dùng lần cuối</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+          actions: [{label: "Đóng", value: null, primary: true, cls: "primary"}]});
+      }
+    });
+  });
 
   function openKeyRequests(id) { go("requests", {key: id}); }
   $("#keys-body").addEventListener("change", (e) => {
@@ -1302,7 +1384,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
   $("#req-next").addEventListener("click", () => { state.offset += state.limit; guarded(loadRequests); });
 
   // ---- routing: #page or #requests?key=..&account=.. ----
-  const loaders = {overview: loadOverview, accounts: loadAccountsPage, keys: loadKeys, requests: loadRequests};
+  const loaders = {overview: loadOverview, accounts: loadAccountsPage, customers: loadCustomers, keys: loadKeys, requests: loadRequests};
   function parseHash() {
     const [page, query] = location.hash.replace(/^#/, "").split("?");
     return {page: loaders[page] ? page : "", params: new URLSearchParams(query || "")};
@@ -1386,7 +1468,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     const p = state.page;
     if (p === "requests" && $("#f-live").checked) guarded(loadRequests);
     else if (p === "accounts" && n % 2 === 0) guarded(loadAccountsPage);
-    else if ((p === "overview" || p === "keys") && n % 6 === 0) guarded(loaders[p]);
+    else if ((p === "overview" || p === "keys" || p === "customers") && n % 6 === 0) guarded(loaders[p]);
     // Keep the sidebar health indicator fresh on pages that do not fetch status.
     if ((p === "requests" || p === "keys") && n % 3 === 0) guarded(loadAccounts);
   }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hmac
+import ipaddress
 
 from fastapi import Request
 
@@ -62,3 +63,23 @@ def require_admin_key(request: Request) -> None:
 def public_base(request: Request) -> str:
     base = get_services(request).settings.public_base
     return base.rstrip("/") if base else str(request.base_url).rstrip("/")
+
+
+def billing_ip(request: Request) -> str:
+    """Client address for rate limits. Cloudflare's header is trusted only when the
+    connection comes from this machine (the tunnel); any other forwarding header is
+    ignored, since a client could set it. IPv6 clients are bucketed by /64."""
+    peer = request.client.host if request.client else ""
+    ip = peer
+    try:
+        if ipaddress.ip_address(peer).is_loopback:
+            ip = request.headers.get("cf-connecting-ip", "").strip() or peer
+    except ValueError:
+        pass
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return ip or "?"
+    if addr.version == 6:
+        return str(ipaddress.ip_network(f"{addr}/64", strict=False))
+    return str(addr)

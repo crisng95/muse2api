@@ -125,3 +125,26 @@ class RequestLogMiddleware:
             self._pending.add(task)
             task.add_done_callback(self._pending.discard)
             await asyncio.shield(task)
+
+
+class NoStoreMiddleware:
+    """``Cache-Control: no-store`` on every response under the given prefixes (the
+    customer portal: its pages and JSON are per customer and must not be cached)."""
+
+    def __init__(self, app: ASGIApp, prefixes: tuple[str, ...] = ("/account",)) -> None:
+        self.app = app
+        self.prefixes = prefixes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not scope.get("path", "").startswith(self.prefixes):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_wrapper(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = [(k, v) for k, v in message.get("headers", [])
+                           if k.lower() != b"cache-control"]
+                message = {**message, "headers": [*headers, (b"cache-control", b"no-store")]}
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)

@@ -12,7 +12,9 @@ from muse2api.api.routes import pages
 from muse2api.core.models import ALIASES, MODELS
 
 # Words that would tell a customer how the service is built.
-_INTERNAL = re.compile(r"cookie|muse\.ai|muse2api|browser|chromium|account", re.I)
+# Customers now have an account (/account); the upstream pool's accounts must not show.
+_INTERNAL = re.compile(r"cookie|muse\.ai|muse2api|browser|chromium|account[_ ]?ids?\b|"
+                       r"accounts\.json|account pool", re.I)
 _I18N = Path(pages.__file__).resolve().parents[2] / "web" / "i18n"
 
 

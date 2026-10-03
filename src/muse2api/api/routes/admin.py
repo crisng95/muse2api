@@ -20,7 +20,14 @@ from ...services.billing import to_micro, usd
 from ...services.container import Services
 from ...upstream.muse import missing_session_cookies
 from ..deps import get_services, require_admin_key
-from ..schemas import AccountCreate, AccountUpdate, KeyCreate, KeyCredit, KeyUpdate
+from ..schemas import (
+    AccountCreate,
+    AccountUpdate,
+    CustomerUpdate,
+    KeyCreate,
+    KeyCredit,
+    KeyUpdate,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin_key)])
 
@@ -129,10 +136,22 @@ def _usage(row: dict | None) -> dict:
     return {k: row[k] for k in _NO_USAGE}
 
 
-async def _key_view(svc: Services, key: ApiKey, balance: int | None = None) -> dict:
-    if balance is None:
-        balance = await svc.billing.balance(key.id)
-    return {**key.public(), "balance_usd": usd(balance)}
+def _key_view(svc: Services, key: ApiKey, balances: dict[str, int]) -> dict:
+    """A key with its customer's wallet balance (``balance_usd``, shared by its keys)."""
+    customer = svc.customers.get(key.customer_id)
+    return {**key.public(), "balance_usd": usd(balances.get(key.customer_id, 0)),
+            "customer": {"id": customer.id, "email": customer.email, "name": customer.name,
+                         "unlimited": customer.unlimited} if customer else None}
+
+
+async def _one_key_view(svc: Services, key: ApiKey) -> dict:
+    return _key_view(svc, key, {key.customer_id: await svc.billing.balance(key.customer_id)})
+
+
+def _customer_of(svc: Services, key: ApiKey) -> str:
+    if not key.customer_id:
+        raise NotFound(f"key '{key.id}' has no customer")
+    return key.customer_id
 
 
 @router.get("/keys")
@@ -141,8 +160,8 @@ async def list_keys(svc: Services = Depends(get_services)) -> dict:
     usage = {r["key_id"]: r for r in (await svc.requests.key_usage())["data"]}
     balances = await svc.billing.balances()
     return {
-        "data": [{**await _key_view(svc, k, balances.get(k.id, 0)),
-                  "usage": _usage(usage.get(k.id))} for k in svc.keys.all()],
+        "data": [{**_key_view(svc, k, balances), "usage": _usage(usage.get(k.id))}
+                 for k in svc.keys.all()],
         "builtin": [{"id": b, "name": b, "usage": _usage(usage.get(b))} for b in BUILTIN_KEYS],
     }
 
@@ -155,9 +174,16 @@ async def key_usage(svc: Services = Depends(get_services)) -> dict:
 
 @router.post("/keys")
 async def create_key(body: KeyCreate, svc: Services = Depends(get_services)) -> dict:
-    key, plaintext = await svc.keys.create(body.name.strip(), body.note)
+    name = body.name.strip()
+    if body.customer_id:
+        if svc.customers.get(body.customer_id) is None:
+            raise NotFound(f"customer '{body.customer_id}' not found")
+        customer_id = body.customer_id
+    else:
+        customer_id = (await svc.customers.create(None, name)).id
+    key, plaintext = await svc.keys.create(name, body.note, customer_id)
     # The only time the plaintext key is ever returned.
-    return {"key": await _key_view(svc, key), "api_key": plaintext}
+    return {"key": await _one_key_view(svc, key), "api_key": plaintext}
 
 
 @router.patch("/keys/{key_id}")
@@ -172,27 +198,78 @@ async def update_key(key_id: str, body: KeyUpdate, svc: Services = Depends(get_s
     if body.unlimited is not None:
         key.unlimited = body.unlimited
     await svc.keys.save()
-    return {"key": await _key_view(svc, key)}
+    return {"key": await _one_key_view(svc, key)}
 
 
 @router.post("/keys/{key_id}/credit")
 async def credit_key(key_id: str, body: KeyCredit, svc: Services = Depends(get_services)) -> dict:
-    """Add prepaid credit (positive, a topup) or correct a balance (negative, an adjust)."""
-    _get_key(svc, key_id)
-    amount = to_micro(body.amount_usd)
-    if not amount:
-        raise InvalidRequest("amount_usd must not be zero")
-    balance = await svc.billing.credit(key_id, amount, body.note.strip())
-    return {"key_id": key_id, "kind": "topup" if amount > 0 else "adjust",
-            "amount_usd": usd(amount), "balance_usd": usd(balance)}
+    """Credit the key's customer wallet: positive is a topup, negative an adjust."""
+    customer_id = _customer_of(svc, _get_key(svc, key_id))
+    return {"key_id": key_id, **await _credit(svc, customer_id, body)}
 
 
 @router.get("/keys/{key_id}/ledger")
 async def key_ledger(key_id: str, limit: int = Query(default=100, ge=1, le=1000),
                      svc: Services = Depends(get_services)) -> dict:
-    """Balance changes of a key, newest first."""
-    _get_key(svc, key_id)
-    return {"data": await svc.billing.ledger(key_id, limit)}
+    """Changes to the key's customer wallet, newest first (``key_id`` says who spent)."""
+    customer_id = _customer_of(svc, _get_key(svc, key_id))
+    return {"data": await svc.billing.ledger(customer_id, limit)}
+
+
+async def _credit(svc: Services, customer_id: str, body: KeyCredit) -> dict:
+    amount = to_micro(body.amount_usd)
+    if not amount:
+        raise InvalidRequest("amount_usd must not be zero")
+    balance = await svc.billing.credit(customer_id, amount, body.note.strip())
+    return {"customer_id": customer_id, "kind": "topup" if amount > 0 else "adjust",
+            "amount_usd": usd(amount), "balance_usd": usd(balance)}
+
+
+# ---- customers (wallet owners) ----
+def _get_customer(svc: Services, customer_id: str):
+    customer = svc.customers.get(customer_id)
+    if customer is None:
+        raise NotFound(f"customer '{customer_id}' not found")
+    return customer
+
+
+@router.get("/customers")
+async def list_customers(svc: Services = Depends(get_services)) -> dict:
+    """Every customer with wallet balance, net spend and keys (newest first)."""
+    balances, spend = await svc.billing.balances(), await svc.billing.spend()
+    keys: dict[str, list] = {}
+    for k in svc.keys.all():
+        keys.setdefault(k.customer_id, []).append(
+            {"id": k.id, "name": k.name, "prefix": k.prefix, "revoked": k.revoked,
+             "unlimited": k.unlimited, "last_used_at": k.last_used_at})
+    return {"data": [{**c.public(), "balance_usd": usd(balances.get(c.id, 0)),
+                      "spend_usd": usd(spend.get(c.id) or 0), "keys": keys.get(c.id, [])}
+                     for c in reversed(svc.customers.all())]}
+
+
+@router.patch("/customers/{customer_id}")
+async def update_customer(customer_id: str, body: CustomerUpdate,
+                          svc: Services = Depends(get_services)) -> dict:
+    _get_customer(svc, customer_id)
+    customer = await svc.customers.update(
+        customer_id, name=body.name.strip() if body.name is not None else None,
+        unlimited=body.unlimited, email=body.email)
+    return {"customer": customer.public()}
+
+
+@router.post("/customers/{customer_id}/credit")
+async def credit_customer(customer_id: str, body: KeyCredit,
+                          svc: Services = Depends(get_services)) -> dict:
+    """Add prepaid credit (positive, a topup) or correct a wallet (negative, an adjust)."""
+    _get_customer(svc, customer_id)
+    return await _credit(svc, customer_id, body)
+
+
+@router.get("/customers/{customer_id}/ledger")
+async def customer_ledger(customer_id: str, limit: int = Query(default=100, ge=1, le=1000),
+                          svc: Services = Depends(get_services)) -> dict:
+    _get_customer(svc, customer_id)
+    return {"data": await svc.billing.ledger(customer_id, limit)}
 
 
 @router.delete("/keys/{key_id}")

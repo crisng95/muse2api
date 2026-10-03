@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 
 from . import __version__
 from .accounts.keepalive import keepalive_loop
-from .api.middleware import RequestLogMiddleware
+from .api.middleware import NoStoreMiddleware, RequestLogMiddleware
 from .api.routes import build_router
 from .config import Settings, get_settings
 from .drivers.base import MuseDriver
@@ -52,6 +52,9 @@ def create_app(settings: Settings | None = None, driver: MuseDriver | None = Non
         await services.requests.open()
         await services.requests.prune(settings.request_log_retention_days)
         await services.requests.backfill_tasks(services.tasks.list(limit=services.tasks.max_kept))
+        await services.payments.open()
+        await services.customers.migrate()
+        await services.customers.load()
         await services.billing.reconcile(services.tasks.list(limit=services.tasks.max_kept))
         await services.driver.startup()
         housekeeping = asyncio.create_task(_housekeeping(services))
@@ -95,4 +98,5 @@ def create_app(settings: Settings | None = None, driver: MuseDriver | None = Non
 
     app.include_router(build_router())
     app.add_middleware(RequestLogMiddleware, request_log=services.requests)
+    app.add_middleware(NoStoreMiddleware)
     return app

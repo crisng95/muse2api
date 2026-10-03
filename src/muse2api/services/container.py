@@ -13,7 +13,9 @@ from ..core.media import MediaStore
 from ..drivers.base import MuseDriver
 from ..drivers.registry import create_driver
 from .billing import REFUNDABLE, Billing
+from .customers import Customers
 from .gateway import Gateway
+from .google import GoogleOAuth
 from .payments import Payments
 from .paypal import PayPalClient
 from .request_log import RequestLog, current_record
@@ -32,6 +34,8 @@ class Services:
     keys: KeyStore
     requests: RequestLog
     billing: Billing
+    customers: Customers
+    google: GoogleOAuth
     payments: Payments
 
     @classmethod
@@ -48,6 +52,8 @@ class Services:
         requests = RequestLog(settings.requests_db)
         keys = KeyStore(settings.keys_file)
         billing = Billing(settings, keys, requests)
+        customers = Customers(settings, keys, billing)
+        billing.customers = customers
 
         async def record_outcome(task: Task) -> None:
             record = current_record.get()
@@ -74,5 +80,7 @@ class Services:
             keys=keys,
             requests=requests,
             billing=billing,
-            payments=Payments(settings, keys, billing, PayPalClient(settings)),
+            customers=customers,
+            google=GoogleOAuth(settings),
+            payments=Payments(settings, keys, billing, customers, PayPalClient(settings)),
         )

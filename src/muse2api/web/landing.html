@@ -59,6 +59,8 @@ svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor;
 .nav-links a { text-decoration: none; color: var(--muted); font-size: 14.5px; font-weight: 500; }
 .nav-links a:hover { color: var(--text); }
 .nav .spacer { flex: 1; }
+.nav .acct { color: var(--muted); font-size: 14.5px; font-weight: 500; text-decoration: none; white-space: nowrap; }
+.nav .acct:hover { color: var(--text); }
 .nav .btn.ghost { display: none; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: 10px; font: 600 15px/1.2 var(--sans); text-decoration: none; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); cursor: pointer; transition: background .15s, border-color .15s, transform .15s; white-space: nowrap; }
@@ -279,6 +281,7 @@ footer a { text-decoration: none; } footer a:hover { color: var(--text); }
     </nav>
     <span class="spacer"></span>
     {{lang_menu}}
+    <a class="acct" href="/account">{{nav.account}}</a>
     <a class="btn ghost sm" href="/docs">{{common.nav.docs}}</a>
     <a class="btn primary sm" href="/billing">{{common.cta.get_key}}</a>
   </div>

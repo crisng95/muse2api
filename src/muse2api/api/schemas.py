@@ -78,6 +78,27 @@ class AccountUpdate(BaseModel):
 class KeyCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     note: str = Field(default="", max_length=500)
+    # Existing customer whose wallet the key spends; empty creates a customer for it.
+    customer_id: str | None = None
+
+
+class CustomerUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+    unlimited: bool | None = None
+    # Set by the admin, so treated as verified (Google sign-in links it); "" clears it.
+    email: str | None = Field(default=None, max_length=254)
+
+
+class PortalKeyCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
+class PortalKeyClaim(BaseModel):
+    api_key: str = Field(min_length=1, max_length=200)
+
+
+class PortalKeyUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
 
 
 class KeyUpdate(BaseModel):
