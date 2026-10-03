@@ -197,6 +197,7 @@ td.num { font-family: var(--mono); font-size: 12.5px; }
 td.trunc { max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
 td.zero { color: var(--faint); }
 td.hot { color: var(--err); font-weight: 650; }
+td.pos { color: var(--ok); font-weight: 650; }
 td .sub { color: var(--muted); font-size: 12px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
 td.actions { text-align: right; }
 td.actions .row { flex-wrap: nowrap; justify-content: flex-end; gap: 4px; }
@@ -247,6 +248,9 @@ tr.builtin td:first-child b { font-family: var(--mono); font-size: 12.5px; }
 .switch input:checked + span { background: var(--ok); }
 .switch input:checked + span::after { transform: translateX(14px); }
 .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+.bal { display: inline-flex; align-items: center; gap: 8px; }
+.bal.neg { color: var(--err); font-weight: 650; }
+.modal .tablewrap { max-height: 55vh; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
 
 /* ---------- modal & toast ---------- */
 .overlay { position: fixed; inset: 0; background: rgba(8, 12, 14, .5); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 60; animation: fade .12s ease-out; }
@@ -429,13 +433,22 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
           <div class="tablewrap">
             <table class="resp">
               <thead><tr>
-                <th>Name</th><th class="hide-sm">Key</th><th>Status</th><th class="num">Total</th><th class="num">24h</th><th class="num">Errors 24h</th><th>Last request</th><th class="hide-sm">Created</th><th></th>
+                <th>Name</th><th class="hide-sm">Key</th><th>Status</th><th class="num">Số dư</th><th class="num">Total</th><th class="num">24h</th><th class="num">Errors 24h</th><th>Last request</th><th class="hide-sm">Created</th><th></th>
               </tr></thead>
               <tbody id="keys-body"></tbody>
             </table>
           </div>
         </div>
-        <p class="muted" style="font-size: 12px; margin: 8px 2px 0;">Số liệu lấy từ request log (giữ lại theo cấu hình retention), không tính poll. Bấm vào một dòng để xem requests của key đó.</p>
+        <p class="muted" style="font-size: 12px; margin: 8px 2px 0;">Số liệu lấy từ request log (giữ lại theo cấu hình retention), không tính poll. Bấm vào một dòng để xem requests của key đó. Số dư là credit trả trước (USD); key <b>Không giới hạn</b> không bị trừ tiền.</p>
+        <div class="panel" style="margin-top: 18px;">
+          <div class="cardhead">Thanh toán PayPal<span class="muted" style="font-size: 12px; font-weight: 400;">khách tự nạp qua /billing · mới nhất ở trên</span></div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Time</th><th>Khách</th><th class="num">Số tiền</th><th>Trạng thái</th><th class="hide-sm">PayPal order</th></tr></thead>
+              <tbody id="purchases-body"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- requests -->
@@ -463,7 +476,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
             <table>
               <thead><tr>
                 <th>Time</th><th>Method</th><th>Path</th><th class="hide-sm">Model</th><th>Key</th>
-                <th class="hide-sm">Account</th><th class="num">Status</th><th class="num">Latency</th><th class="hide-sm">Client</th>
+                <th class="hide-sm">Account</th><th class="num">Status</th><th class="num">Latency</th><th class="num">Cost</th><th class="hide-sm">Client</th>
               </tr></thead>
               <tbody id="req-body"></tbody>
             </table>
@@ -512,6 +525,12 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
   const now = () => Date.now() / 1000;
   const fmtNum = (n) => n == null ? "–" : Number(n).toLocaleString("en-US");
   const fmtMs = (ms) => ms == null ? "–" : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)} s`;
+  // Balances and costs in USD: cents for big amounts, up to micro-USD for small ones.
+  const fmtUsd = (v) => {
+    if (v == null) return "–";
+    const s = Math.abs(v) >= 1 ? Math.abs(v).toFixed(2) : Math.abs(v).toFixed(6).replace(/0{1,4}$/, "");
+    return `${v < 0 ? "−" : ""}$${s}`;
+  };
   const fmtPct = (r) => `${(r * 100).toFixed(r && r < 0.1 ? 2 : 1)}%`;
   const icon = (name) => `<svg class="i"><use href="#i-${name}"/></svg>`;
   function ago(ts) {
@@ -992,8 +1011,11 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     const sum = (f) => all.reduce((s, u) => s + (u[f] || 0), 0);
     const active = state.keys.filter((k) => !k.revoked).length;
     const req24 = sum("requests_24h"), err24 = sum("errors_24h");
+    const billed = state.keys.filter((k) => !k.unlimited);
+    const credit = billed.reduce((s, k) => s + (k.balance_usd || 0), 0);
     $("#key-tiles").innerHTML = [
       tile("Keys hoạt động", fmtNum(active), `${fmtNum(state.keys.length - active)} đã thu hồi`),
+      tile("Tổng số dư", fmtUsd(credit), `${fmtNum(billed.length)} key tính phí`),
       tile("Requests 24h", fmtNum(req24), "mọi key, không tính poll"),
       tile("Lỗi 24h", fmtNum(err24), req24 ? `${fmtPct(err24 / req24)} số request` : "–", err24 && err24 / req24 >= 0.1 ? "bad" : ""),
     ].join("");
@@ -1002,23 +1024,45 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
         <td class="cell-name"><div><b>${esc(k.name)}</b>${k.note ? `<div class="sub" title="${esc(k.note)}">${esc(k.note)}</div>` : ""}</div><span class="m-status">${statusBadgeK(k)}</span></td>
         <td class="mono hide-sm" data-label="Key">${esc(k.prefix)}…</td>
         <td class="cell-status" data-label="Status">${statusBadgeK(k)}</td>
+        <td class="num" data-label="Số dư"><span class="bal${!k.unlimited && k.balance_usd <= 0 ? " neg" : ""}">${k.unlimited ? `<span class="badge b-info">Không giới hạn</span>` : esc(fmtUsd(k.balance_usd))}
+          <label class="switch" title="${k.unlimited ? "Không giới hạn — bấm để bắt đầu tính phí" : "Đang tính phí — bấm để chuyển sang không giới hạn"}"><input type="checkbox" data-act="unlimited" ${k.unlimited ? "checked" : ""} aria-label="Không giới hạn cho ${esc(k.name)}"><span></span></label></span></td>
         ${usageCells(k.usage)}
         <td class="hide-sm" data-label="Created" title="${esc(fullTime(k.created_at))}">${esc(ago(k.created_at))}</td>
         <td class="actions"><div class="row">
+          <button class="btn sm primary" type="button" data-act="credit">Nạp credit</button>
+          <button class="btn sm" type="button" data-act="ledger">Lịch sử</button>
           <button class="btn sm" type="button" data-act="edit">Đổi tên</button>
           <button class="btn sm" type="button" data-act="${k.revoked ? "unrevoke" : "revoke"}">${k.revoked ? "Khôi phục" : "Thu hồi"}</button>
           <button class="btn sm danger" type="button" data-act="delete">Xoá</button>
         </div></td>
-      </tr>`).join("") || `<tr><td colspan="9" class="empty" style="grid-column:1/-1">Chưa có key nào. Bấm <b>Cấp API key</b> để tạo key đầu tiên.</td></tr>`;
+      </tr>`).join("") || `<tr><td colspan="10" class="empty" style="grid-column:1/-1">Chưa có key nào. Bấm <b>Cấp API key</b> để tạo key đầu tiên.</td></tr>`;
     const builtin = state.builtin.map((b) => `<tr class="click builtin" data-id="${esc(b.id)}" tabindex="0" title="Xem requests của ${esc(b.name)}">
         <td class="cell-name"><div><b>${esc(b.name)}</b><div class="sub">${esc(BUILTIN_NOTE[b.id] || "")}</div></div><span class="m-status"><span class="badge b-mute">có sẵn</span></span></td>
         <td class="mono hide-sm muted" data-label="Key">env</td>
         <td class="cell-status" data-label="Status"><span class="badge b-mute">có sẵn</span></td>
+        <td class="num muted" data-label="Số dư">Không giới hạn</td>
         ${usageCells(b.usage)}
         <td class="hide-sm muted" data-label="Created">–</td>
         <td class="actions muted" style="font-size:12px">chỉ đọc</td>
       </tr>`).join("");
-    $("#keys-body").innerHTML = rows + (builtin ? `<tr class="sep"><td colspan="9">Định danh có sẵn</td></tr>${builtin}` : "");
+    $("#keys-body").innerHTML = rows + (builtin ? `<tr class="sep"><td colspan="10">Định danh có sẵn</td></tr>${builtin}` : "");
+    await loadPurchases();
+  }
+
+  const PURCHASE_STATUS = {completed: ["b-ok", "đã thanh toán"], pending: ["b-mute", "chờ thanh toán"], failed: ["b-err", "lỗi"],
+    refunded: ["b-info", "đã hoàn tiền"], needs_support: ["b-warn", "cần xử lý: key đã thu hồi/xoá"]};
+  async function loadPurchases() {
+    const res = await api("/admin/purchases?limit=50");
+    $("#purchases-body").innerHTML = res.data.map((p) => {
+      const [cls, label] = PURCHASE_STATUS[p.status] || ["b-mute", p.status];
+      const who = p.mode === "new" ? (p.email || "") : (p.key_name || p.key_id || "");
+      const sub = p.mode === "new" ? (p.key_name ? "key mới đã cấp" : "khách mới") : "nạp thêm cho key";
+      return `<tr><td class="mono" title="${esc(fullTime(p.created_at))}">${esc(ago(p.created_at))}</td>
+        <td><div><b>${esc(who)}</b><div class="sub" title="${esc(p.payer_email || "")}">${esc(sub)}${p.payer_email && p.payer_email !== p.email ? ` · PayPal: ${esc(p.payer_email)}` : ""}</div></div></td>
+        <td class="num">${esc(fmtUsd(p.amount_usd))}</td>
+        <td><span class="badge ${cls}">${esc(label)}</span></td>
+        <td class="mono hide-sm muted" title="${esc(p.capture_id ? `capture ${p.capture_id}` : "")}">${esc(p.paypal_order_id)}</td></tr>`;
+    }).join("") || `<tr><td colspan="5" class="empty">Chưa có thanh toán nào.</td></tr>`;
   }
 
   async function keyForm(title, k = {}, submit = "Lưu") {
@@ -1059,7 +1103,49 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
     btn.innerHTML = ok ? `${icon("copy")}Đã sao chép` : "Hãy copy thủ công";
   });
 
+  async function creditForm(k) {
+    return modal({
+      title: `Nạp credit cho “${k.name}”`,
+      body: `<p>Số dư hiện tại: <b class="mono">${esc(fmtUsd(k.balance_usd))}</b>${k.unlimited ? " — key đang <b>Không giới hạn</b>, sẽ không bị trừ tiền cho tới khi tắt." : ""}</p>
+        <label class="f">Số tiền (USD) <span class="hint">số âm = điều chỉnh giảm</span><input type="number" id="cf-amount" step="0.01" placeholder="vd. 10" autocomplete="off"></label>
+        <label class="f">Ghi chú <span class="hint">không bắt buộc — vd. số hoá đơn, chuyển khoản</span><input type="text" id="cf-note" maxlength="500" autocomplete="off"></label>`,
+      actions: [{label: "Huỷ", value: null},
+        {label: "Nạp", primary: true, cls: "primary",
+         collect: () => ({amount_usd: Number($("#cf-amount").value), note: $("#cf-note").value.trim()}),
+         check: (v) => $("#cf-amount").value.trim() && Number.isFinite(v.amount_usd) && v.amount_usd !== 0 ? "" : "Nhập số tiền khác 0."}],
+    });
+  }
+  const LEDGER_KIND = {topup: ["b-ok", "Nạp"], charge: ["b-mute", "Trừ"], refund: ["b-info", "Hoàn"], adjust: ["b-warn", "Điều chỉnh"]};
+  async function showLedger(k) {
+    const res = await api(`/admin/keys/${encodeURIComponent(k.id)}/ledger?limit=200`);
+    const rows = res.data.map((e) => {
+      const [cls, label] = LEDGER_KIND[e.kind] || ["b-mute", e.kind];
+      return `<tr><td class="mono" title="${esc(fullTime(e.ts))}">${esc(ago(e.ts))}</td>
+        <td><span class="badge ${cls}">${esc(label)}</span></td>
+        <td class="num${e.amount_usd < 0 ? "" : " pos"}">${esc((e.amount_usd > 0 ? "+" : "") + fmtUsd(e.amount_usd))}</td>
+        <td class="num">${esc(fmtUsd(e.balance_after_usd))}</td>
+        <td class="mono trunc muted" title="${esc(e.ref || "")}">${esc(e.ref || "")}</td>
+        <td class="trunc" title="${esc(e.note || "")}">${esc(e.note || "")}</td></tr>`;
+    }).join("") || `<tr><td colspan="6" class="empty">Chưa có giao dịch nào.</td></tr>`;
+    await modal({
+      title: `Lịch sử số dư — ${k.name}`, wide: true,
+      body: `<p>Số dư: <b class="mono">${esc(fmtUsd(k.balance_usd))}</b>${k.unlimited ? ` · <span class="badge b-info">Không giới hạn</span>` : ""}. Mới nhất ở trên, tối đa 200 dòng.</p>
+        <div class="tablewrap"><table><thead><tr><th>Time</th><th>Loại</th><th class="num">Số tiền</th><th class="num">Số dư sau</th><th>Ref</th><th>Ghi chú</th></tr></thead><tbody>${rows}</tbody></table></div>`,
+      actions: [{label: "Đóng", value: null, primary: true, cls: "primary"}],
+    });
+  }
+
   function openKeyRequests(id) { go("requests", {key: id}); }
+  $("#keys-body").addEventListener("change", (e) => {
+    const input = e.target.closest("input[data-act=unlimited]");
+    if (!input) return;
+    const id = input.closest("tr[data-id]").dataset.id;
+    guarded(async () => {
+      await api(`/admin/keys/${encodeURIComponent(id)}`, {method: "PATCH", body: {unlimited: input.checked}});
+      toast(input.checked ? "Key không giới hạn — không tính phí" : "Key bắt đầu bị tính phí");
+      await loadKeys();
+    });
+  });
   $("#keys-body").addEventListener("keydown", (e) => {
     const tr = e.target.closest("tr[data-id]");
     if (tr && e.key === "Enter" && e.target === tr) openKeyRequests(tr.dataset.id);
@@ -1067,6 +1153,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
   $("#keys-body").addEventListener("click", (e) => {
     const tr = e.target.closest("tr[data-id]");
     if (!tr) return;
+    if (e.target.closest(".switch")) return;  // handled by the change listener
     const btn = e.target.closest("button[data-act]");
     if (!btn) return openKeyRequests(tr.dataset.id);
     const k = state.keys.find((x) => x.id === tr.dataset.id);
@@ -1075,6 +1162,16 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
       const path = `/admin/keys/${encodeURIComponent(k.id)}`;
       const ident = `<b>${esc(k.name)}</b> (<span class="mono">${esc(k.prefix)}…</span>)`;
       switch (btn.dataset.act) {
+        case "credit": {
+          const form = await creditForm(k);
+          if (!form) return;
+          const res = await api(`${path}/credit`, {method: "POST", body: form});
+          toast(`${res.kind === "topup" ? "Đã nạp" : "Đã điều chỉnh"} ${fmtUsd(res.amount_usd)} — số dư ${fmtUsd(res.balance_usd)}`);
+          break;
+        }
+        case "ledger":
+          await showLedger(k);
+          return;
         case "edit": {
           const form = await keyForm("Đổi tên key", k);
           if (!form) return;
@@ -1158,8 +1255,9 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
         <td class="hide-sm trunc">${esc(accountLabel(r.account_id))}</td>
         <td class="num" title="${esc(r.error || "")}">${statusBadge(r.status_code)}${taskBadge(r)}</td>
         <td class="num">${esc(fmtMs(r.latency_ms))}</td>
+        <td class="num${r.cost_micro ? "" : " zero"}">${r.cost_micro == null ? "–" : esc(fmtUsd(r.cost_micro / 1e6))}</td>
         <td class="hide-sm mono">${esc(r.client_ip || "")}</td>
-      </tr>`).join("") || `<tr><td colspan="9" class="empty">Không có request nào khớp bộ lọc.</td></tr>`;
+      </tr>`).join("") || `<tr><td colspan="10" class="empty">Không có request nào khớp bộ lọc.</td></tr>`;
     const end = state.offset + res.data.length;
     $("#req-range").textContent = res.total ? `${state.offset + 1}–${end} / ${fmtNum(res.total)}` : "";
     $("#req-prev").disabled = state.offset === 0;
@@ -1172,6 +1270,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-si
       ["Status", r.status_code], ["Latency", fmtMs(r.latency_ms)], ["Stream", r.stream ? "yes" : "no"],
       ["Poll", r.poll ? "yes" : "no"], ["Model", r.model], ["Key", r.key_name ? `${r.key_name} (${r.key_id})` : ""],
       ["Account", r.account_id ? `${accountLabel(r.account_id)} (${r.account_id})` : ""],
+      ["Chi phí", r.cost_micro == null ? "không tính phí" : `${fmtUsd(r.cost_micro / 1e6)}${r.cost_micro === 0 ? " (đã hoàn)" : ""}`],
       ["Lần thử lỗi", r.failed_attempts ? `${r.failed_attempts} (đã chuyển account)` : ""],
       ["Task", r.task_id ? `${r.task_id} · ${r.task_status || "running"}${r.task_ms != null ? ` · ${fmtMs(r.task_ms)}` : ""}` : ""], ["Client IP", r.client_ip], ["User agent", r.user_agent],
     ];

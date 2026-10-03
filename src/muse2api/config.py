@@ -12,6 +12,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DriverName = Literal["mock", "browser", "http"]
 PoolStrategyName = Literal["round_robin", "lru", "affinity"]
+PayPalEnv = Literal["sandbox", "live"]
 
 
 class Settings(BaseSettings):
@@ -78,6 +79,31 @@ class Settings(BaseSettings):
         "(best) or birefnet-general-lite (faster).",
     )
 
+    # --- billing (prepaid USD credit per stored client key) ---
+    billing_enabled: bool = Field(
+        default=True, description="Charge stored client keys for successful requests. "
+        "The admin key, the legacy api_key and keys marked unlimited are never charged.")
+    price_image_usd: float = Field(default=0.015, description="Per generated image.")
+    price_video_per_second_usd: float = Field(
+        default=0.006, description="Per second of requested video duration.")
+    video_default_seconds: int = Field(
+        default=10, description="Duration billed when a video request gives none.")
+    price_chat_input_per_mtok_usd: float = 1.0
+    price_chat_output_per_mtok_usd: float = 3.0
+
+    # --- self-serve checkout (/billing, PayPal Orders API v2) ---
+    # Checkout is disabled (the page shows the support email) until both are set.
+    paypal_client_id: str = ""
+    paypal_client_secret: str = ""
+    paypal_env: PayPalEnv = "sandbox"
+    paypal_allow_sandbox: bool = Field(
+        default=False, description="Run checkout against the PayPal sandbox. Sandbox payments "
+        "are fake but the credit is real, so only for testing.")
+    paypal_webhook_id: str = Field(
+        default="", description="Webhook ID from the PayPal app; empty ignores webhooks.")
+    topup_min_usd: float = 5.0
+    topup_max_usd: float = 1000.0
+
     # --- keepalive (session renewal) ---
     keepalive_enabled: bool = False
     keepalive_interval: float = 6 * 3600
@@ -129,6 +155,12 @@ class Settings(BaseSettings):
         self.key_file.chmod(0o600)
         self.api_key = key
         return key
+
+    @property
+    def checkout_enabled(self) -> bool:
+        # Sandbox payments are fake money, so they need an explicit opt-in.
+        return bool(self.paypal_client_id and self.paypal_client_secret) and (
+            self.paypal_env == "live" or self.paypal_allow_sandbox)
 
     @property
     def effective_admin_key(self) -> str:

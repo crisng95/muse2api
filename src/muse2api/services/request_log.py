@@ -5,7 +5,8 @@ stack (the gateway) adds to the in-flight row through ``current_record``. Async
 image/video submits return 200 straight away, so the task's outcome is written back
 onto the submit row when it finishes (``finish_task``) and counts as an error. Each
 attempt that failed on an account (including ones the gateway then failed over from,
-which the client never sees) goes into ``attempt_errors`` as well. All
+which the client never sees) goes into ``attempt_errors`` as well. ``cost_micro``
+is what the key was charged (micro-USD, net of refunds; NULL when not billed). All
 database work runs in a worker thread; a failed write is logged and dropped,
 never surfaced to the client.
 """
@@ -30,7 +31,7 @@ current_record: ContextVar[dict[str, Any] | None] = ContextVar("current_record",
 
 COLUMNS = ("ts", "method", "path", "model", "key_id", "key_name", "account_id", "status_code",
            "latency_ms", "stream", "poll", "error", "client_ip", "user_agent", "task_id",
-           "failed_attempts")
+           "failed_attempts", "cost_micro")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS requests (
@@ -66,7 +67,8 @@ CREATE INDEX IF NOT EXISTS idx_attempt_errors_ts ON attempt_errors (ts);
 """
 
 # Columns added after the first release; created on open when missing.
-_ADDED_COLUMNS = {"task_status": "TEXT", "task_ms": "INTEGER", "failed_attempts": "INTEGER"}
+_ADDED_COLUMNS = {"task_status": "TEXT", "task_ms": "INTEGER", "failed_attempts": "INTEGER",
+                  "cost_micro": "INTEGER"}
 
 # A request failed if it got an HTTP error or its async task failed later.
 FAILED = "(status_code >= 400 OR COALESCE(task_status = 'failed', 0))"
@@ -129,6 +131,10 @@ class RequestLog:
         with self._lock:
             return fn(self._db(), *args)
 
+    async def run(self, fn, *args):
+        """Run ``fn(db, *args)`` in a worker thread on the shared connection."""
+        return await asyncio.to_thread(self._call, fn, *args)
+
     async def open(self) -> None:
         try:
             await asyncio.to_thread(self._call, lambda db: None)
@@ -170,10 +176,12 @@ class RequestLog:
 
     async def finish_task(self, task_id: str, status: str, finished_at: float,
                           error: str | None = None, account_id: str | None = None,
-                          attempt_errors: list[tuple] | None = None) -> None:
-        """Write an async task's outcome onto the request that submitted it."""
+                          attempt_errors: list[tuple] | None = None,
+                          cost_micro: int | None = None) -> None:
+        """Write an async task's outcome onto the request that submitted it.
+        ``cost_micro`` replaces the submit row's cost (0 once the charge is refunded)."""
         attempts = list(attempt_errors or [])
-        args = (status, finished_at, error, account_id, len(attempts), task_id)
+        args = (status, finished_at, error, account_id, len(attempts), cost_micro, task_id)
 
         def run(db: sqlite3.Connection) -> None:
             if attempts:
@@ -192,7 +200,8 @@ class RequestLog:
 
     async def backfill_tasks(self, tasks: list[Any]) -> None:
         """Fill in outcomes for submit rows logged before outcomes were recorded."""
-        rows = [(t.status.value, t.updated_at, (t.error or {}).get("message"), None, None, t.id)
+        rows = [(t.status.value, t.updated_at, (t.error or {}).get("message"), None, None, None,
+                 t.id)
                 for t in tasks if t.finished]
         if not rows:
             return
@@ -345,7 +354,7 @@ class RequestLog:
 _FINISH_SQL = (
     "UPDATE requests SET task_status = ?, task_ms = CAST((? - ts) * 1000 AS INTEGER), "
     "error = COALESCE(error, ?), account_id = COALESCE(account_id, ?), "
-    "failed_attempts = COALESCE(?, failed_attempts) "
+    "failed_attempts = COALESCE(?, failed_attempts), cost_micro = COALESCE(?, cost_micro) "
     "WHERE task_id = ? AND poll = 0"
 )
 _ATTEMPT_SQL = "INSERT INTO attempt_errors (ts, account_id, error, task_id) VALUES (?, ?, ?, ?)"

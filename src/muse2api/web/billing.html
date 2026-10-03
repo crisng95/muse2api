@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{billing.meta.title}}</title>
+<meta name="description" content="{{billing.meta.description}}">
+{{hreflang}}
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230b6b61%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+{{checkout.sdk}}
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f7f5; --panel: #ffffff; --panel-2: #eef1ed; --border: #e0e4dd; --border-strong: #c8cec4;
+  --text: #12171a; --muted: #566067; --faint: #889097;
+  --accent: #0b6b61; --accent-hover: #095a52; --accent-text: #ffffff; --accent-soft: #dcefeb; --accent-ink: #0a5f56;
+  --glow: rgba(47, 191, 171, .22);
+  --warn-bg: #fff6e5; --warn-border: #f0cf8f; --warn-text: #7a4b00;
+  --err-bg: #fdecec; --err-border: #f3b9b7; --err-text: #9b1c1c;
+  --shadow: 0 1px 2px rgba(17, 23, 26, .05), 0 8px 24px rgba(17, 23, 26, .05);
+  --sans: "Be Vietnam Pro", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0b0f11; --panel: #12181b; --panel-2: #182024; --border: #222b30; --border-strong: #34414a;
+    --text: #e4e9eb; --muted: #95a0a6; --faint: #6b777e;
+    --accent: #2fbfab; --accent-hover: #45d0bd; --accent-text: #04201c; --accent-soft: #10302c; --accent-ink: #4fd3c0;
+    --glow: rgba(47, 191, 171, .16);
+    --warn-bg: #2a2010; --warn-border: #5c4520; --warn-text: #f2c97a;
+    --err-bg: #2a1414; --err-border: #5c2a2a; --err-text: #f4a3a0;
+    --shadow: none;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+svg { display: block; }
+a { color: inherit; }
+code { font-family: var(--mono); font-size: .9em; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+[hidden] { display: none !important; }
+.wrap { width: 100%; max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* nav (as on the landing page) */
+.nav { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); border-bottom: 1px solid var(--border); }
+.nav .wrap { display: flex; align-items: center; gap: 24px; height: 64px; }
+.brand { display: flex; align-items: center; gap: 10px; white-space: nowrap; text-decoration: none; font-weight: 700; font-size: 17px; letter-spacing: -.02em; }
+.glyph { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(140deg, #3fd1bd, #0b6b61); color: #04201c; font: 800 15px/1 var(--sans); }
+.nav-links { display: flex; gap: 22px; margin-left: 8px; }
+.nav-links a { text-decoration: none; color: var(--muted); font-size: 14.5px; font-weight: 500; }
+.nav-links a:hover { color: var(--text); }
+.nav .spacer { flex: 1; }
+.lang { position: relative; }
+.lang summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 9px; color: var(--muted); font-size: 14px; font-weight: 500; }
+.lang summary::-webkit-details-marker { display: none; }
+.lang summary:hover, .lang[open] summary { color: var(--text); background: var(--panel-2); }
+.lang ul { position: absolute; right: 0; top: calc(100% + 6px); min-width: 180px; margin: 0; padding: 6px; list-style: none; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 24px 60px rgba(10, 14, 16, .18); z-index: 60; }
+.lang li a { display: block; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-size: 14.5px; }
+.lang li a:hover { background: var(--panel-2); }
+.lang li a[aria-current="true"] { color: var(--accent-ink); font-weight: 600; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: 10px; font: 600 15px/1.2 var(--sans); text-decoration: none; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--panel-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+/* page */
+.head { position: relative; padding: 52px 0 28px; overflow: hidden; }
+.head::before { content: ""; position: absolute; inset: 0; background: radial-gradient(640px 300px at 80% 0%, var(--glow), transparent 70%); pointer-events: none; }
+.head .wrap { position: relative; }
+.kicker { font: 600 13px/1 var(--mono); color: var(--accent-ink); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 14px; }
+h1 { font-size: clamp(30px, 4.4vw, 44px); line-height: 1.1; letter-spacing: -.035em; font-weight: 800; margin: 0 0 14px; text-wrap: balance; }
+.lede { font-size: 17.5px; color: var(--muted); margin: 0; max-width: 40em; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 22px; align-items: start; padding-bottom: 72px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); padding: 26px; min-width: 0; }
+.summary { position: sticky; top: 84px; }
+fieldset { border: 0; margin: 0 0 24px; padding: 0; min-width: 0; }
+fieldset:last-child { margin-bottom: 0; }
+legend, .label { display: block; font-weight: 700; font-size: 15px; margin-bottom: 10px; padding: 0; }
+.hint { color: var(--muted); font-size: 13.5px; margin: 6px 0 0; }
+.hint code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+
+.presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.preset { padding: 14px 8px; border-radius: 12px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); font: 700 18px/1 var(--sans); letter-spacing: -.02em; cursor: pointer; }
+.preset:hover { border-color: var(--accent); }
+.preset[aria-pressed="true"] { border: 2px solid var(--accent); background: var(--accent-soft); color: var(--accent-ink); padding: 13px 7px; }
+.custom { margin-top: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.custom label { font-size: 14px; color: var(--muted); }
+.money { display: flex; align-items: center; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg); padding: 0 12px; width: 150px; }
+.money span { color: var(--muted); font-weight: 600; }
+.money input { border: 0; background: none; padding: 10px 6px; width: 100%; font: 600 16px var(--sans); color: var(--text); }
+.money input:focus { outline: none; }
+.money:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.modes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.mode { display: flex; gap: 10px; align-items: flex-start; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--border-strong); background: var(--bg); cursor: pointer; font-size: 14.5px; font-weight: 600; line-height: 1.35; }
+.mode input { margin: 2px 0 0; accent-color: var(--accent); flex: none; }
+.mode:has(input:checked) { border: 2px solid var(--accent); background: var(--accent-soft); padding: 12px 13px; }
+.field { margin-top: 14px; }
+.field label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.field input { width: 100%; padding: 11px 13px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--bg); color: var(--text); font: 15px var(--sans); }
+.field input.mono { font-family: var(--mono); font-size: 14px; }
+.field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.rows { display: grid; gap: 8px; margin: 0 0 6px; }
+.rows div { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; color: var(--muted); }
+.rows b { color: var(--text); font-size: 16px; }
+.rows .total b { font-size: 26px; letter-spacing: -.03em; }
+.estimate { color: var(--muted); font-size: 13.5px; margin: 0 0 18px; padding-bottom: 16px; border-bottom: 1px dashed var(--border); }
+#paypal-buttons { min-height: 48px; }
+.note { color: var(--muted); font-size: 13px; margin: 14px 0 0; display: flex; gap: 8px; align-items: flex-start; }
+.note svg { margin-top: 2px; color: var(--accent-ink); }
+.note a, .msg a, .done a:not(.btn) { color: var(--accent-ink); }
+
+.sandbox { margin: 0 0 18px; padding: 10px 14px; border-radius: 10px; border: 2px dashed var(--warn-border); background: var(--warn-bg); color: var(--warn-text); font-size: 14.5px; }
+.msg { margin: 0 0 14px; padding: 11px 14px; border-radius: 10px; font-size: 14.5px; border: 1px solid var(--err-border); background: var(--err-bg); color: var(--err-text); }
+.msg.info { border-color: var(--border); background: var(--panel-2); color: var(--text); }
+.busy { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14.5px; margin-bottom: 14px; }
+.busy i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border-strong); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* success */
+.done { max-width: 680px; margin: 0 auto 72px; }
+.done .tick { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); margin-bottom: 14px; }
+.done .tick svg { width: 24px; height: 24px; }
+.done h2 { margin: 0 0 6px; font-size: 24px; letter-spacing: -.02em; }
+.keybox { margin: 18px 0 12px; display: flex; gap: 10px; align-items: stretch; }
+.keybox code { flex: 1; min-width: 0; padding: 14px 16px; border-radius: 12px; border: 2px solid var(--accent); background: var(--accent-soft); color: var(--text); font-size: 15px; font-weight: 500; word-break: break-all; user-select: all; }
+.warnbox { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--warn-border); background: var(--warn-bg); color: var(--warn-text); font-size: 14.5px; }
+.bal { display: flex; justify-content: space-between; align-items: baseline; margin: 18px 0; padding: 14px 16px; border-radius: 12px; background: var(--panel-2); }
+.bal b { font-size: 24px; letter-spacing: -.03em; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+footer { padding: 0 0 40px; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+footer nav { display: flex; gap: 18px; margin-left: auto; flex-wrap: wrap; }
+footer a { text-decoration: none; } footer a:hover { color: var(--text); }
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .summary { position: static; }
+}
+@media (max-width: 600px) {
+  .wrap { padding: 0 16px; }
+  .nav-links { display: none; }
+  .lang summary span { display: none; }
+  .head { padding: 36px 0 20px; }
+  .card { padding: 20px 16px; }
+  .presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .modes { grid-template-columns: minmax(0, 1fr); }
+  .keybox { flex-direction: column; }
+  footer nav { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .busy i { animation: none; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 6 8-6"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+</svg>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="glyph" aria-hidden="true">M</span>Muse API</a>
+    <nav class="nav-links" aria-label="{{common.nav.label}}">
+      <a href="/#models">{{common.nav.models}}</a>
+      <a href="/#pricing">{{common.nav.pricing}}</a>
+      <a href="/docs">{{common.nav.docs}}</a>
+    </nav>
+    <span class="spacer"></span>
+    {{lang_menu}}
+  </div>
+</header>
+
+<main id="checkout" data-state="{{checkout.state}}" data-min="{{topup.min}}" data-max="{{topup.max}}"
+      data-image="{{price.image}}" data-video="{{price.video_10s}}">
+  <section class="head">
+    <div class="wrap">
+      {{checkout.banner}}
+      <div class="kicker">{{billing.kicker}}</div>
+      <h1>{{billing.title}}</h1>
+      <p class="lede">{{billing.lede}}</p>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <!-- checkout not configured -->
+    <div class="card done" id="disabled" hidden>
+      <div class="tick"><svg class="i"><use href="#i-mail"/></svg></div>
+      <h2>{{billing.disabled_title}}</h2>
+      <p>{{billing.disabled_text}}</p>
+    </div>
+
+    <form class="layout" id="form" novalidate hidden>
+      <div class="card">
+        <fieldset>
+          <legend>{{billing.amount_label}}</legend>
+          <div class="presets">
+            <button class="preset" type="button" data-amount="10" aria-pressed="false">$10</button>
+            <button class="preset" type="button" data-amount="25" aria-pressed="true">$25</button>
+            <button class="preset" type="button" data-amount="50" aria-pressed="false">$50</button>
+            <button class="preset" type="button" data-amount="100" aria-pressed="false">$100</button>
+          </div>
+          <div class="custom">
+            <label for="custom">{{billing.custom_label}}</label>
+            <span class="money"><span aria-hidden="true">$</span><input id="custom" type="number" inputmode="decimal" min="{{topup.min}}" max="{{topup.max}}" step="0.01" placeholder="25"></span>
+          </div>
+          <p class="hint">{{billing.custom_hint}}</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>{{billing.mode_label}}</legend>
+          <div class="modes">
+            <label class="mode"><input type="radio" name="mode" value="new" checked>{{billing.mode_new}}</label>
+            <label class="mode"><input type="radio" name="mode" value="topup">{{billing.mode_topup}}</label>
+          </div>
+          <div class="field" id="f-email">
+            <label for="email">{{billing.email_label}}</label>
+            <input id="email" type="email" autocomplete="email" maxlength="254" placeholder="you@company.com">
+            <p class="hint">{{billing.email_hint}}</p>
+          </div>
+          <div class="field" id="f-key" hidden>
+            <label for="apikey">{{billing.key_label}}</label>
+            <input id="apikey" class="mono" type="password" autocomplete="off" spellcheck="false" maxlength="200" placeholder="m2a-…">
+            <p class="hint">{{billing.key_hint}}</p>
+          </div>
+        </fieldset>
+      </div>
+
+      <aside class="card summary" aria-labelledby="pay-title">
+        <div class="label" id="pay-title">{{billing.pay_title}}</div>
+        <div class="rows">
+          <div class="total"><span>{{billing.total}}</span><b id="total">$25.00</b></div>
+          <div><span>{{billing.credit}}</span><b id="credit">$25.00</b></div>
+        </div>
+        <p class="estimate" id="estimate"></p>
+        <div class="msg" id="error" role="alert" hidden></div>
+        <div class="busy" id="busy" hidden><i></i>{{billing.processing}}</div>
+        <div id="paypal-buttons"></div>
+        <p class="note"><svg class="i"><use href="#i-lock"/></svg><span>{{billing.secure_note}}</span></p>
+        <p class="note"><span>{{billing.help}}</span></p>
+      </aside>
+    </form>
+
+    <!-- after payment -->
+    <div class="card done" id="done" hidden aria-live="polite">
+      <div class="tick"><svg class="i"><use href="#i-check"/></svg></div>
+      <h2 id="done-title">{{billing.success_title}}</h2>
+      <p class="msg info" id="done-msg" hidden></p>
+      <div id="newkey" hidden>
+        <div class="label">{{billing.key_title}}</div>
+        <div class="keybox">
+          <code id="key-value"></code>
+          <button class="btn primary" type="button" id="copy"><svg class="i"><use href="#i-copy"/></svg><span>{{common.copy}}</span></button>
+        </div>
+        <div class="warnbox">{{billing.key_warning}}</div>
+      </div>
+      <div class="bal" id="balance-row" hidden><span>{{billing.balance}}</span><b id="balance"></b></div>
+      <div class="actions">
+        <a class="btn primary" href="/docs#quickstart">{{billing.next_docs}}</a>
+        <a class="btn" href="/billing">{{billing.again}}</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- localized messages for the script -->
+  <div hidden id="t">
+    <span data-k="estimate">{{billing.estimate}}</span>
+    <span data-k="err_amount">{{billing.err_amount}}</span>
+    <span data-k="err_email">{{billing.err_email}}</span>
+    <span data-k="err_key">{{billing.err_key}}</span>
+    <span data-k="err_key_unknown">{{billing.err_key_unknown}}</span>
+    <span data-k="err_declined">{{billing.err_declined}}</span>
+    <span data-k="err_rate">{{billing.err_rate}}</span>
+    <span data-k="err_generic">{{billing.err_generic}}</span>
+    <span data-k="err_cancel">{{billing.err_cancel}}</span>
+    <span data-k="err_sdk">{{billing.err_sdk}}</span>
+    <span data-k="topup_done">{{billing.topup_done}}</span>
+    <span data-k="pending">{{billing.pending}}</span>
+    <span data-k="already">{{billing.already}}</span>
+    <span data-k="needs_support">{{billing.needs_support}}</span>
+    <span data-k="copied">{{common.copied}}</span>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>© <span id="year">2026</span> ISEMI</span>
+    <nav aria-label="{{common.footer.label}}">
+      <a href="/">{{common.nav.home}}</a>
+      <a href="/docs">{{common.nav.docs}}</a>
+      <a href="mailto:{{support_email}}">{{common.footer.support}}</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const root = $("#checkout");
+  const T = (k) => $(`#t [data-k="${k}"]`).innerHTML;
+  const MIN = Number(root.dataset.min), MAX = Number(root.dataset.max);
+  const fmt = (n) => "$" + n.toFixed(2);
+  // claims: PayPal order id -> the secret our server returned with it; capture needs both.
+  const state = {amount: 25, mode: "new", claims: {} };
+  $("#year").textContent = new Date().getFullYear();
+  document.querySelectorAll(".lang a").forEach(a => a.addEventListener("click", () => { a.href += location.hash; }));
+
+  if (root.dataset.state !== "on") { $("#disabled").hidden = false; return; }
+  $("#form").hidden = false;
+
+  // ---- form ----
+  function showError(html) { const el = $("#error"); el.innerHTML = html; el.hidden = !html; }
+  function update() {
+    const ok = validAmount();
+    $("#total").textContent = $("#credit").textContent = ok ? fmt(state.amount) : "–";
+    const image = parseFloat(root.dataset.image.replace("$", "")), video = parseFloat(root.dataset.video.replace("$", ""));
+    $("#estimate").textContent = ok ? T("estimate")
+      .replace("{images}", Math.floor(state.amount / image).toLocaleString())
+      .replace("{videos}", Math.floor(state.amount / video).toLocaleString()) : "";
+  }
+  const validAmount = () => Number.isFinite(state.amount) && state.amount >= MIN && state.amount <= MAX
+    && Math.abs(state.amount * 100 - Math.round(state.amount * 100)) < 1e-6;
+  const validEmail = (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+  function check() {
+    if (!validAmount()) return T("err_amount");
+    if (state.mode === "new" && !validEmail($("#email").value.trim())) return T("err_email");
+    if (state.mode === "topup" && !$("#apikey").value.trim().startsWith("m2a-")) return T("err_key");
+    return "";
+  }
+
+  document.querySelectorAll(".preset").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".preset").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    $("#custom").value = "";
+    state.amount = Number(b.dataset.amount);
+    showError(""); update();
+  }));
+  $("#custom").addEventListener("input", (e) => {
+    document.querySelectorAll(".preset").forEach(x => x.setAttribute("aria-pressed", "false"));
+    state.amount = e.target.value === "" ? NaN : Number(e.target.value);
+    showError(""); update();
+  });
+  document.querySelectorAll("input[name=mode]").forEach(r => r.addEventListener("change", () => {
+    state.mode = r.value;
+    $("#f-email").hidden = state.mode !== "new";
+    $("#f-key").hidden = state.mode !== "topup";
+    showError("");
+  }));
+  $("#form").addEventListener("submit", (e) => e.preventDefault());
+  update();
+
+  // ---- payment ----
+  async function post(path, body) {
+    const r = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json"},
+                                 body: JSON.stringify(body || {})});
+    let data = {};
+    try { data = await r.json(); } catch {}
+    if (!r.ok) {
+      const code = (data.error || {}).code;
+      const known = {invalid_api_key: "err_key_unknown", invalid_email: "err_email", rate_limited: "err_rate",
+                     payment_declined: "err_declined"}[code];
+      const err = new Error(known ? T(known) : T("err_generic"));
+      err.shown = true;
+      throw err;
+    }
+    return data;
+  }
+  function busy(on) { $("#busy").hidden = !on; }
+
+  function done(res) {
+    $("#form").hidden = true;
+    $("#done").hidden = false;
+    const msg = $("#done-msg");
+    const text = res.status === "pending" ? T("pending") : res.status === "needs_support" ? T("needs_support")
+      : res.api_key ? "" : res.message ? T("already") : T("topup_done");
+    msg.innerHTML = text; msg.hidden = !text;
+    if (res.api_key) { $("#newkey").hidden = false; $("#key-value").textContent = res.api_key; }
+    if (typeof res.balance_usd === "number") {
+      $("#balance-row").hidden = false;
+      $("#balance").textContent = fmt(res.balance_usd);
+    }
+    $("#done").scrollIntoView({behavior: "smooth", block: "start"});
+  }
+  $("#copy").addEventListener("click", async () => {
+    const value = $("#key-value").textContent;
+    try { await navigator.clipboard.writeText(value); } catch {
+      const range = document.createRange(); range.selectNodeContents($("#key-value"));
+      getSelection().removeAllRanges(); getSelection().addRange(range); return;
+    }
+    $("#copy span").textContent = T("copied");
+  });
+
+  function buttons() {
+    const pp = window.paypal;
+    if (!pp || !pp.Buttons) { showError(T("err_sdk")); return; }
+    let lastError = "";
+    const options = (fundingSource) => ({
+      fundingSource,
+      style: {layout: "vertical", shape: "rect", label: "pay", height: 46},
+      onClick: (data, actions) => {
+        const problem = check();
+        showError(problem);
+        return problem ? actions.reject() : actions.resolve();
+      },
+      createOrder: async () => {
+        lastError = "";
+        const body = {amount_usd: state.amount};
+        if (state.mode === "new") body.email = $("#email").value.trim();
+        else body.api_key = $("#apikey").value.trim();
+        try {
+          const order = await post("/billing/orders", body);
+          state.claims[order.id] = order.claim;
+          return order.id;
+        }
+        catch (e) { lastError = e.message; throw e; }
+      },
+      onApprove: async (data) => {
+        busy(true); showError("");
+        try {
+          done(await post(`/billing/orders/${encodeURIComponent(data.orderID)}/capture`,
+                          {claim: state.claims[data.orderID] || ""}));
+        }
+        catch (e) { showError(e.message); }
+        finally { busy(false); }
+      },
+      onCancel: () => showError(T("err_cancel")),
+      onError: () => showError(lastError || T("err_generic")),
+    });
+    for (const source of [pp.FUNDING.PAYPAL, pp.FUNDING.CARD]) {
+      const b = pp.Buttons(options(source));
+      if (!b.isEligible()) continue;
+      const slot = document.createElement("div");
+      slot.style.marginBottom = "10px";
+      $("#paypal-buttons").appendChild(slot);
+      b.render(slot);
+    }
+  }
+  // The SDK script is deferred; "load" fires after it ran (or failed to load).
+  if (document.readyState === "complete") buttons(); else addEventListener("load", buttons);
+})();
+</script>
+</body>
+</html>

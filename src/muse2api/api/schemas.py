@@ -84,3 +84,21 @@ class KeyUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     note: str | None = Field(default=None, max_length=500)
     revoked: bool | None = None
+    unlimited: bool | None = None
+
+
+class CheckoutOrder(BaseModel):
+    amount_usd: float = Field(gt=0, allow_inf_nan=False)
+    # A new customer gives an email; a top-up gives the key to credit instead.
+    email: str | None = Field(default=None, max_length=254)
+    api_key: str | None = Field(default=None, max_length=200)
+
+
+class CheckoutCapture(BaseModel):
+    claim: str = Field(default="", max_length=200)
+
+
+class KeyCredit(BaseModel):
+    # Positive tops up; negative is a manual adjustment.
+    amount_usd: float = Field(ge=-1_000_000, le=1_000_000)
+    note: str = Field(default="", max_length=500)

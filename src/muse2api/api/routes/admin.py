@@ -16,10 +16,11 @@ from ...accounts.keepalive import renew_account
 from ...accounts.model import Account, AccountStatus
 from ...auth.keys import ApiKey
 from ...errors import InvalidRequest, NotFound
+from ...services.billing import to_micro, usd
 from ...services.container import Services
 from ...upstream.muse import missing_session_cookies
 from ..deps import get_services, require_admin_key
-from ..schemas import AccountCreate, AccountUpdate, KeyCreate, KeyUpdate
+from ..schemas import AccountCreate, AccountUpdate, KeyCreate, KeyCredit, KeyUpdate
 
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin_key)])
 
@@ -128,12 +129,20 @@ def _usage(row: dict | None) -> dict:
     return {k: row[k] for k in _NO_USAGE}
 
 
+async def _key_view(svc: Services, key: ApiKey, balance: int | None = None) -> dict:
+    if balance is None:
+        balance = await svc.billing.balance(key.id)
+    return {**key.public(), "balance_usd": usd(balance)}
+
+
 @router.get("/keys")
 async def list_keys(svc: Services = Depends(get_services)) -> dict:
     """Stored keys plus the built-in identities, each with request counts from the log."""
     usage = {r["key_id"]: r for r in (await svc.requests.key_usage())["data"]}
+    balances = await svc.billing.balances()
     return {
-        "data": [{**k.public(), "usage": _usage(usage.get(k.id))} for k in svc.keys.all()],
+        "data": [{**await _key_view(svc, k, balances.get(k.id, 0)),
+                  "usage": _usage(usage.get(k.id))} for k in svc.keys.all()],
         "builtin": [{"id": b, "name": b, "usage": _usage(usage.get(b))} for b in BUILTIN_KEYS],
     }
 
@@ -148,7 +157,7 @@ async def key_usage(svc: Services = Depends(get_services)) -> dict:
 async def create_key(body: KeyCreate, svc: Services = Depends(get_services)) -> dict:
     key, plaintext = await svc.keys.create(body.name.strip(), body.note)
     # The only time the plaintext key is ever returned.
-    return {"key": key.public(), "api_key": plaintext}
+    return {"key": await _key_view(svc, key), "api_key": plaintext}
 
 
 @router.patch("/keys/{key_id}")
@@ -160,8 +169,30 @@ async def update_key(key_id: str, body: KeyUpdate, svc: Services = Depends(get_s
         key.note = body.note
     if body.revoked is not None:
         key.revoked = body.revoked
+    if body.unlimited is not None:
+        key.unlimited = body.unlimited
     await svc.keys.save()
-    return {"key": key.public()}
+    return {"key": await _key_view(svc, key)}
+
+
+@router.post("/keys/{key_id}/credit")
+async def credit_key(key_id: str, body: KeyCredit, svc: Services = Depends(get_services)) -> dict:
+    """Add prepaid credit (positive, a topup) or correct a balance (negative, an adjust)."""
+    _get_key(svc, key_id)
+    amount = to_micro(body.amount_usd)
+    if not amount:
+        raise InvalidRequest("amount_usd must not be zero")
+    balance = await svc.billing.credit(key_id, amount, body.note.strip())
+    return {"key_id": key_id, "kind": "topup" if amount > 0 else "adjust",
+            "amount_usd": usd(amount), "balance_usd": usd(balance)}
+
+
+@router.get("/keys/{key_id}/ledger")
+async def key_ledger(key_id: str, limit: int = Query(default=100, ge=1, le=1000),
+                     svc: Services = Depends(get_services)) -> dict:
+    """Balance changes of a key, newest first."""
+    _get_key(svc, key_id)
+    return {"data": await svc.billing.ledger(key_id, limit)}
 
 
 @router.delete("/keys/{key_id}")
@@ -169,6 +200,18 @@ async def delete_key(key_id: str, svc: Services = Depends(get_services)) -> dict
     if not await svc.keys.remove(key_id):
         raise NotFound(f"key '{key_id}' not found")
     return {"deleted": key_id}
+
+
+# ---- self-serve purchases ----
+@router.get("/purchases")
+async def list_purchases(limit: int = Query(default=100, ge=1, le=500),
+                         svc: Services = Depends(get_services)) -> dict:
+    """PayPal checkouts, newest first, with the name of the key each one credited."""
+    rows = await svc.payments.recent(limit)
+    for row in rows:
+        key = svc.keys.get(row["key_id"]) if row["key_id"] else None
+        row["key_name"] = key.name if key else None
+    return {"data": rows}
 
 
 # ---- request log ----

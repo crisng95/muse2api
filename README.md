@@ -280,6 +280,14 @@ All settings come from environment variables (prefix `MUSE2API_`) or a `.env` fi
 | `MUSE2API_CHROMIUM_PATH` | auto-detected | Path to the browser executable |
 | `MUSE2API_KEEPALIVE_ENABLED` | `false` | Periodically renew sessions in the background |
 | `MUSE2API_MATTING_MODEL` | `birefnet-general` | Model for `background: "transparent"` (`birefnet-general-lite` is faster) |
+| `MUSE2API_BILLING_ENABLED` | `true` | Charge stored client keys' prepaid USD credit (402 when it runs out); admin, legacy and unlimited keys are free |
+| `MUSE2API_PRICE_IMAGE_USD` · `MUSE2API_PRICE_VIDEO_PER_SECOND_USD` | `0.015` · `0.006` | Price per image and per requested video second (`MUSE2API_VIDEO_DEFAULT_SECONDS`, `10`, when none is given) |
+| `MUSE2API_PRICE_CHAT_INPUT_PER_MTOK_USD` · `MUSE2API_PRICE_CHAT_OUTPUT_PER_MTOK_USD` | `1.0` · `3.0` | Chat price per million prompt / completion tokens |
+| `MUSE2API_PAYPAL_CLIENT_ID` · `MUSE2API_PAYPAL_CLIENT_SECRET` | empty | PayPal REST app credentials for self-serve checkout at `/billing`; empty disables checkout |
+| `MUSE2API_PAYPAL_ENV` | `sandbox` | `sandbox` or `live` |
+| `MUSE2API_PAYPAL_ALLOW_SANDBOX` | `false` | Allow checkout in `sandbox` (fake payments, real credit — testing only) |
+| `MUSE2API_PAYPAL_WEBHOOK_ID` | empty | ID of the webhook pointing at `/billing/paypal/webhook`; empty ignores webhooks |
+| `MUSE2API_TOPUP_MIN_USD` · `MUSE2API_TOPUP_MAX_USD` | `5` · `1000` | Allowed checkout amount range |
 
 ## Roadmap
 

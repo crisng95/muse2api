@@ -25,6 +25,12 @@ STALL_HINTS = ("Still sending", "Connecting...")
 GLITCH_HINTS = ("ran into a problem while responding",)
 
 
+def is_glitch_reply(text: str) -> bool:
+    """A finished chat reply that is only muse.ai's failure message, not an answer
+    (a long reply merely quoting the phrase is still an answer)."""
+    return len(text) < 300 and any(h in text.lower() for h in GLITCH_HINTS)
+
+
 def q(value: str) -> str:
     """JSON-quote a Python string for safe interpolation into JS."""
     return json.dumps(value)

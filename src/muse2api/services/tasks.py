@@ -29,8 +29,12 @@ class TaskStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+def new_task_id() -> str:
+    return "task_" + uuid.uuid4().hex[:16]
+
+
 class Task(BaseModel):
-    id: str = Field(default_factory=lambda: "task_" + uuid.uuid4().hex[:16])
+    id: str = Field(default_factory=new_task_id)
     kind: str
     status: TaskStatus = TaskStatus.QUEUED
     progress: int = 0
@@ -87,8 +91,10 @@ class TaskManager:
     def list(self, limit: int = 100) -> list[Task]:
         return sorted(self._tasks.values(), key=lambda t: t.created_at, reverse=True)[:limit]
 
-    def submit(self, kind: str, request: dict[str, Any], runner: Runner) -> Task:
-        task = Task(kind=kind, request=request)
+    def submit(self, kind: str, request: dict[str, Any], runner: Runner,
+               task_id: str | None = None) -> Task:
+        # A caller may pick the id up front, e.g. to reserve credit under it first.
+        task = Task(id=task_id or new_task_id(), kind=kind, request=request)
         self._tasks[task.id] = task
         self._persist()
         self._running[task.id] = asyncio.create_task(self._run(task, runner))

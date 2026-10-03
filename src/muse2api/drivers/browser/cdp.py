@@ -26,6 +26,8 @@ class CDPSession:
         self._ids = itertools.count(1)
         self._pending: dict[int, asyncio.Future] = {}
         self._listeners: dict[str, list[Callable[[dict], None]]] = defaultdict(list)
+        self.close_reason = ""
+        """Why the connection ended, once ``closed``."""
         self._reader = asyncio.create_task(self._read_loop())
 
     @classmethod
@@ -55,8 +57,11 @@ class CDPSession:
                         except Exception:  # noqa: BLE001
                             log.exception("cdp listener for %s failed", method)
         except Exception as exc:  # noqa: BLE001
+            self.close_reason = f"{type(exc).__name__}: {exc}"
             log.debug("cdp reader stopped: %s", exc)
         finally:
+            if not self.close_reason:
+                self.close_reason = f"closed by peer (code {self._ws.close_code})"
             for fut in self._pending.values():
                 if not fut.done():
                     fut.set_exception(CDPError("cdp connection closed"))
@@ -90,6 +95,7 @@ class CDPSession:
         return res.get("result", {}).get("value")
 
     async def close(self) -> None:
+        self.close_reason = self.close_reason or "closed locally"
         with contextlib.suppress(Exception):
             await self._ws.close()
         self._reader.cancel()

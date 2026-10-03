@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Muse API</title>
+<meta name="description" content="{{landing.meta.description}}">
+<meta property="og:title" content="{{landing.meta.og_title}}">
+<meta property="og:description" content="{{landing.meta.og_description}}">
+{{hreflang}}
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230b6b61%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f6f7f5; --panel: #ffffff; --panel-2: #eef1ed; --border: #e0e4dd; --border-strong: #c8cec4;
+  --text: #12171a; --muted: #566067; --faint: #889097;
+  --accent: #0b6b61; --accent-hover: #095a52; --accent-text: #ffffff; --accent-soft: #dcefeb; --accent-ink: #0a5f56;
+  --glow: rgba(47, 191, 171, .22);
+  --code-bg: #0e1417; --code-panel: #141c20; --code-border: #222c31; --code-text: #d6dfe2; --code-muted: #71808a;
+  --tok-str: #8fd6a8; --tok-kw: #7fc4f5; --tok-num: #f2b56b; --tok-com: #6b7a83; --tok-fn: #e6a0f0;
+  --shadow: 0 1px 2px rgba(17, 23, 26, .05), 0 8px 24px rgba(17, 23, 26, .05);
+  --shadow-lg: 0 24px 60px rgba(10, 14, 16, .18);
+  --sans: "Be Vietnam Pro", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0b0f11; --panel: #12181b; --panel-2: #182024; --border: #222b30; --border-strong: #34414a;
+    --text: #e4e9eb; --muted: #95a0a6; --faint: #6b777e;
+    --accent: #2fbfab; --accent-hover: #45d0bd; --accent-text: #04201c; --accent-soft: #10302c; --accent-ink: #4fd3c0;
+    --glow: rgba(47, 191, 171, .16);
+    --code-bg: #080b0d; --code-panel: #0f1417; --code-border: #1d262b;
+    --shadow: none;
+    --shadow-lg: 0 24px 60px rgba(0, 0, 0, .55);
+  }
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+img, svg { display: block; }
+a { color: inherit; }
+code, pre { font-family: var(--mono); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.wrap { width: 100%; max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+svg.i { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- nav ---------- */
+.nav { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); border-bottom: 1px solid transparent; transition: border-color .2s; }
+.nav.scrolled { border-bottom-color: var(--border); }
+.nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
+.brand { display: flex; align-items: center; gap: 10px; white-space: nowrap; text-decoration: none; font-weight: 700; font-size: 17px; letter-spacing: -.02em; }
+.glyph { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(140deg, #3fd1bd, #0b6b61); color: #04201c; font: 800 15px/1 var(--sans); }
+.nav-links { display: flex; gap: 24px; margin-left: 8px; }
+.nav-links a { text-decoration: none; color: var(--muted); font-size: 14.5px; font-weight: 500; }
+.nav-links a:hover { color: var(--text); }
+.nav .spacer { flex: 1; }
+.nav .btn.ghost { display: none; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 18px; border-radius: 10px; font: 600 15px/1.2 var(--sans); text-decoration: none; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); cursor: pointer; transition: background .15s, border-color .15s, transform .15s; white-space: nowrap; }
+.btn:hover { background: var(--panel-2); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.sm { padding: 7px 14px; font-size: 14px; border-radius: 9px; }
+.btn.ghost { background: none; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--text); background: var(--panel-2); }
+
+/* ---------- hero ---------- */
+.hero { position: relative; padding: 72px 0 84px; overflow: hidden; }
+.hero::before { content: ""; position: absolute; inset: 0; background:
+    radial-gradient(700px 360px at 78% 10%, var(--glow), transparent 70%),
+    radial-gradient(500px 300px at 8% 0%, var(--glow), transparent 70%);
+  pointer-events: none; }
+.hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+  background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 44px 44px; mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 75%); -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 75%); }
+.hero .wrap { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 56px; align-items: center; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel); font-size: 13px; font-weight: 500; color: var(--muted); box-shadow: var(--shadow); }
+.eyebrow b { background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+h1 { font-size: clamp(36px, 5.2vw, 58px); line-height: 1.08; letter-spacing: -.035em; font-weight: 800; margin: 20px 0 18px; text-wrap: balance; }
+h1 em { font-style: normal; background: linear-gradient(100deg, var(--accent) 10%, #3fd1bd 90%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lede { font-size: 18.5px; color: var(--muted); margin: 0 0 30px; max-width: 34em; text-wrap: pretty; }
+.lede code { font-size: .88em; color: var(--text); background: var(--panel-2); padding: 1px 6px; border-radius: 5px; }
+.hero .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+.hero .ctas .btn { padding: 13px 22px; font-size: 16px; }
+.hero .meta { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 30px; color: var(--muted); font-size: 14px; }
+.hero .meta span { display: inline-flex; align-items: center; gap: 7px; }
+.hero .meta svg { color: var(--accent); }
+
+/* ---------- code window ---------- */
+.codewin { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 14px; box-shadow: var(--shadow-lg); overflow: hidden; color: var(--code-text); }
+.codewin .bar { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--code-border); background: var(--code-panel); }
+.codewin .dots { display: flex; gap: 6px; margin-right: 10px; }
+.codewin .dots i { width: 10px; height: 10px; border-radius: 50%; background: #2a3439; }
+.codewin .tab { background: none; border: 0; color: var(--code-muted); font: 500 13px/1 var(--mono); padding: 7px 10px; border-radius: 7px; cursor: pointer; }
+.codewin .tab:hover { color: var(--code-text); }
+.codewin .tab[aria-selected="true"] { background: rgba(255,255,255,.07); color: #fff; }
+.codewin .copy { margin-left: auto; background: none; border: 0; color: var(--code-muted); cursor: pointer; padding: 6px; border-radius: 6px; display: grid; place-items: center; }
+.codewin .copy:hover { color: #fff; background: rgba(255,255,255,.07); }
+.codewin pre { margin: 0; padding: 18px 20px 20px; font-size: 13.5px; line-height: 1.7; overflow-x: auto; tab-size: 4; }
+.tok-str { color: var(--tok-str); } .tok-kw { color: var(--tok-kw); } .tok-num { color: var(--tok-num); } .tok-com { color: var(--tok-com); font-style: italic; } .tok-flag { color: var(--tok-fn); }
+
+/* ---------- sections ---------- */
+section.block { padding: 88px 0; }
+section.block.alt { background: var(--panel); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.kicker { font: 600 13px/1 var(--mono); color: var(--accent-ink); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 14px; }
+h2 { font-size: clamp(28px, 3.6vw, 40px); line-height: 1.15; letter-spacing: -.03em; font-weight: 800; margin: 0 0 14px; text-wrap: balance; }
+.section-head { max-width: 640px; margin-bottom: 44px; }
+.section-head p { color: var(--muted); font-size: 17px; margin: 0; }
+.section-head.center { margin-left: auto; margin-right: auto; text-align: center; }
+
+/* features strip */
+.features { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.feature { padding: 22px; border-radius: 14px; border: 1px solid var(--border); background: var(--bg); }
+section.block:not(.alt) .feature { background: var(--panel); box-shadow: var(--shadow); }
+.feature .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); margin-bottom: 14px; }
+.feature h3 { margin: 0 0 6px; font-size: 16.5px; letter-spacing: -.01em; }
+.feature p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+/* models */
+.models { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.model { display: flex; flex-direction: column; padding: 26px; border-radius: 16px; background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow); position: relative; overflow: hidden; }
+.model::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--model-c, var(--accent)); }
+.model .top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.model .ic { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; background: color-mix(in srgb, var(--model-c) 14%, transparent); color: var(--model-c); }
+.model .ic svg { width: 22px; height: 22px; }
+.model .kind { margin-left: auto; font: 600 11.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 5px 9px; }
+.model h3 { font: 700 20px/1.2 var(--mono); letter-spacing: -.02em; margin: 0 0 8px; }
+.model > p { color: var(--muted); margin: 0 0 18px; font-size: 15px; }
+.model ul { list-style: none; padding: 0; margin: 0 0 22px; display: grid; gap: 9px; font-size: 14.5px; }
+.model li { display: flex; gap: 10px; align-items: flex-start; }
+.model li svg { width: 17px; height: 17px; margin-top: 3px; color: var(--model-c); }
+.model .ep { margin-top: auto; padding-top: 16px; border-top: 1px dashed var(--border); display: grid; gap: 6px; }
+.model .ep code { font-size: 12.5px; color: var(--muted); }
+.model .ep code b { color: var(--model-c); font-weight: 600; margin-right: 6px; }
+.m-chat { --model-c: #2b8be0; } .m-image { --model-c: #0f9a8a; } .m-video { --model-c: #c2549a; }
+@media (prefers-color-scheme: dark) { .m-chat { --model-c: #6db3f2; } .m-image { --model-c: #2fbfab; } .m-video { --model-c: #e58ac2; } }
+.alias-note { margin-top: 22px; display: flex; gap: 12px; align-items: flex-start; padding: 14px 18px; border-radius: 12px; background: var(--panel-2); color: var(--muted); font-size: 14.5px; }
+.alias-note svg { margin-top: 3px; color: var(--accent-ink); }
+.alias-note code { font-size: 13px; color: var(--text); }
+
+/* pricing */
+.plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
+.plan { display: flex; flex-direction: column; padding: 28px 26px; border-radius: 18px; background: var(--bg); border: 1px solid var(--border); position: relative; }
+.plan.featured { background: var(--panel); border: 2px solid var(--accent); box-shadow: 0 18px 50px -18px var(--glow), var(--shadow); padding: 27px 25px; }
+.plan .badge { position: absolute; top: -13px; left: 25px; background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 999px; letter-spacing: .02em; }
+.plan h3 { margin: 0; font-size: 19px; letter-spacing: -.01em; }
+.plan .for { color: var(--muted); font-size: 14.5px; margin: 4px 0 20px; }
+.plan .price { display: flex; align-items: baseline; gap: 6px; margin-bottom: 22px; }
+.plan .price b { font-size: 38px; font-weight: 800; letter-spacing: -.035em; line-height: 1; }
+.plan .price span { color: var(--muted); font-size: 15px; }
+.plan ul { list-style: none; padding: 0; margin: 0 0 26px; display: grid; gap: 11px; font-size: 15px; }
+.plan li { display: flex; gap: 10px; align-items: flex-start; }
+.plan li svg { width: 18px; height: 18px; margin-top: 3px; color: var(--accent); }
+.plan li b { font-weight: 700; }
+.plan .btn { margin-top: auto; width: 100%; padding: 12px 18px; }
+.price-note { text-align: center; color: var(--muted); font-size: 14px; margin: 26px 0 0; }
+
+/* steps */
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; counter-reset: step; }
+.step { padding: 26px; border-radius: 16px; border: 1px solid var(--border); background: var(--panel); box-shadow: var(--shadow); }
+.step::before { counter-increment: step; content: counter(step); display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--accent-text); font-weight: 800; margin-bottom: 16px; }
+.step h3 { margin: 0 0 6px; font-size: 17px; }
+.step p { margin: 0; color: var(--muted); font-size: 15px; }
+.step code { font-size: 13px; background: var(--panel-2); padding: 1px 6px; border-radius: 5px; color: var(--text); }
+
+/* faq */
+.faq { max-width: 800px; margin: 0 auto; display: grid; gap: 10px; }
+.faq details { border: 1px solid var(--border); border-radius: 12px; background: var(--bg); padding: 0 20px; }
+.faq summary { cursor: pointer; list-style: none; padding: 18px 0; font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 12px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: ""; margin-left: auto; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translateY(-3px); transition: transform .2s; flex: none; }
+.faq details[open] summary::after { transform: rotate(225deg) translate(-2px, -1px); }
+.faq details p { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
+.faq code { font-size: 13px; color: var(--text); background: var(--panel-2); padding: 1px 6px; border-radius: 5px; }
+.faq a { color: var(--accent-ink); }
+
+/* contact */
+.contact { position: relative; overflow: hidden; border-radius: 22px; padding: 56px 48px; background: linear-gradient(135deg, #0b6b61, #094c45 55%, #0d2f2c); color: #eafaf7; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 40px; align-items: center; }
+.contact::after { content: ""; position: absolute; right: -120px; top: -160px; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(63, 209, 189, .35), transparent 65%); pointer-events: none; }
+.contact h2 { color: #fff; }
+.contact p { margin: 0; color: #b9e5de; font-size: 17px; }
+.channels { position: relative; z-index: 1; display: grid; gap: 10px; }
+.channel { display: flex; align-items: center; gap: 14px; padding: 15px 18px; border-radius: 12px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); text-decoration: none; color: #fff; font-weight: 600; transition: background .15s; }
+.channel:hover { background: rgba(255,255,255,.15); }
+.channel small { display: block; font-weight: 400; color: #b9e5de; font-size: 13.5px; }
+.channel .ic { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: rgba(255,255,255,.12); flex: none; }
+.channel .arrow { margin-left: auto; opacity: .7; }
+
+/* footer */
+footer { padding: 40px 0 48px; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+footer nav { display: flex; gap: 20px; margin-left: auto; flex-wrap: wrap; }
+footer a { text-decoration: none; } footer a:hover { color: var(--text); }
+
+/* language menu */
+.lang { position: relative; }
+.lang summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 9px; color: var(--muted); font-size: 14px; font-weight: 500; }
+.lang summary::-webkit-details-marker { display: none; }
+.lang summary:hover { color: var(--text); background: var(--panel-2); }
+.lang[open] summary { color: var(--text); background: var(--panel-2); }
+.lang ul { position: absolute; right: 0; top: calc(100% + 6px); min-width: 180px; margin: 0; padding: 6px; list-style: none; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 60; }
+.lang li a { display: block; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-size: 14.5px; }
+.lang li a:hover { background: var(--panel-2); }
+.lang li a[aria-current="true"] { color: var(--accent-ink); font-weight: 600; }
+
+/* price cards */
+.plan .unit { display: block; color: var(--muted); font-size: 14px; margin: -14px 0 22px; }
+.plan .price small { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+.examples { margin: 26px auto 0; max-width: 860px; display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); align-items: center; gap: 0; border: 1px solid var(--border); border-radius: 14px; background: var(--bg); overflow: hidden; }
+.examples > * { padding: 14px 18px; border-left: 1px solid var(--border); font-size: 14.5px; color: var(--muted); }
+.examples > :first-child { border-left: 0; font-weight: 700; color: var(--text); background: var(--accent-soft); }
+.examples b { display: block; color: var(--text); font-size: 18px; letter-spacing: -.01em; }
+.price-cta { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 960px) {
+  .hero .wrap { grid-template-columns: minmax(0, 1fr); gap: 44px; }
+  .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .models, .plans, .steps { grid-template-columns: minmax(0, 1fr); max-width: 560px; margin-left: auto; margin-right: auto; }
+  .plans { gap: 26px; }
+  .contact { grid-template-columns: minmax(0, 1fr); padding: 40px 28px; }
+  .examples { grid-template-columns: minmax(0, 1fr); }
+  .examples > * { border-left: 0; border-top: 1px solid var(--border); }
+  .examples > :first-child { border-top: 0; }
+}
+@media (max-width: 720px) {
+  .wrap { padding: 0 16px; }
+  .nav-links { display: none; }
+  .nav .btn.ghost { display: inline-flex; }
+  .lang summary span { display: none; }
+  .hero { padding: 48px 0 60px; }
+  .lede { font-size: 17px; }
+  section.block { padding: 64px 0; }
+  .features { grid-template-columns: minmax(0, 1fr); }
+  .codewin pre { font-size: 12.5px; padding: 16px; }
+  footer nav { margin-left: 0; }
+}
+@media (max-width: 400px) {
+  .nav .btn.ghost { display: none; }
+  .hero .ctas .btn { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0V8ZM12 17v4"/></symbol>
+  <symbol id="i-stream" viewBox="0 0 24 24"><path d="M3 7h10M3 12h16M3 17h7"/><circle cx="17" cy="7" r="1.4"/><circle cx="14" cy="17" r="1.4"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="M3 13l9 5 9-5"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12Z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="9.5" r="1.8"/><path d="m21 16-5-5-9 9"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10.5 5-3v9l-5-3"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 6 8-6"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4 18-7Z"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+  <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v4"/><rect x="4" y="9" width="16" height="10" rx="2.5"/><circle cx="16" cy="14" r="1.2"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
+</svg>
+
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="glyph" aria-hidden="true">M</span>Muse API</a>
+    <nav class="nav-links" aria-label="{{common.nav.label}}">
+      <a href="#models">{{common.nav.models}}</a>
+      <a href="#pricing">{{common.nav.pricing}}</a>
+      <a href="#how">{{common.nav.how}}</a>
+      <a href="/docs">{{common.nav.docs}}</a>
+    </nav>
+    <span class="spacer"></span>
+    {{lang_menu}}
+    <a class="btn ghost sm" href="/docs">{{common.nav.docs}}</a>
+    <a class="btn primary sm" href="/billing">{{common.cta.get_key}}</a>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow"><b>{{landing.hero.badge}}</b>{{landing.hero.eyebrow}}</span>
+      <h1>{{landing.hero.title}}<br> <em>{{landing.hero.title_em}}</em></h1>
+      <p class="lede">{{landing.hero.lede}}</p>
+      <div class="ctas">
+        <a class="btn primary" href="#pricing">{{landing.hero.cta_pricing}}</a>
+        <a class="btn" href="/docs"><svg class="i"><use href="#i-book"/></svg>{{landing.hero.cta_docs}}</a>
+      </div>
+      <div class="meta">
+        <span><svg class="i"><use href="#i-check"/></svg>{{landing.hero.meta_sdk}}</span>
+        <span><svg class="i"><use href="#i-check"/></svg>{{landing.hero.meta_stream}}</span>
+        <span><svg class="i"><use href="#i-check"/></svg>{{landing.hero.meta_payg}}</span>
+      </div>
+    </div>
+
+    <div class="codewin" id="hero-code">
+      <div class="bar" role="tablist" aria-label="{{landing.hero.code_label}}">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <button class="tab" role="tab" aria-selected="true" data-tab="py">Python</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="js">Node.js</button>
+        <button class="tab" role="tab" aria-selected="false" data-tab="sh">cURL</button>
+        <button class="copy" type="button" title="{{common.copy}}" aria-label="{{common.copy}}"><svg class="i"><use href="#i-copy"/></svg></button>
+      </div>
+<pre data-pane="py" data-lang="python"><code>from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://muse.isemi.io/v1",
+    api_key="m2a-your-key",
+)
+
+img = client.images.generate(
+    model="muse-image",
+    prompt="A red fox in an autumn forest, morning light",
+    size="16:9",
+)
+print(img.data[0].url)</code></pre>
+<pre data-pane="js" data-lang="js" hidden><code>import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "https://muse.isemi.io/v1",
+  apiKey: "m2a-your-key",
+});
+
+const img = await client.images.generate({
+  model: "muse-image",
+  prompt: "A red fox in an autumn forest, morning light",
+  size: "16:9",
+});
+console.log(img.data[0].url);</code></pre>
+<pre data-pane="sh" data-lang="bash" hidden><code>curl https://muse.isemi.io/v1/images/generations \
+  -H "Authorization: Bearer $MUSE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "muse-image",
+    "prompt": "A red fox in an autumn forest, morning light",
+    "size": "16:9"
+  }'</code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="block alt">
+  <div class="wrap">
+    <div class="features">
+      <div class="feature">
+        <div class="ic"><svg class="i"><use href="#i-plug"/></svg></div>
+        <h3>{{landing.features.compat_title}}</h3>
+        <p>{{landing.features.compat_text}}</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg class="i"><use href="#i-stream"/></svg></div>
+        <h3>{{landing.features.stream_title}}</h3>
+        <p>{{landing.features.stream_text}}</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg class="i"><use href="#i-clock"/></svg></div>
+        <h3>{{landing.features.async_title}}</h3>
+        <p>{{landing.features.async_text}}</p>
+      </div>
+      <div class="feature">
+        <div class="ic"><svg class="i"><use href="#i-layers"/></svg></div>
+        <h3>{{landing.features.refs_title}}</h3>
+        <p>{{landing.features.refs_text}}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="models">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="kicker">{{common.nav.models}}</div>
+      <h2>{{landing.models.title}}</h2>
+      <p>{{landing.models.lede}}</p>
+    </div>
+    <div class="models">
+      <article class="model m-chat">
+        <div class="top"><span class="ic"><svg class="i"><use href="#i-chat"/></svg></span><span class="kind">{{common.kind.chat}}</span></div>
+        <h3>muse-chat</h3>
+        <p>{{landing.models.chat_text}}</p>
+        <ul>
+          <li><svg class="i"><use href="#i-check"/></svg>{{landing.models.chat_1}}</li>
+          <li><svg class="i"><use href="#i-check"/></svg>{{landing.models.chat_2}}</li>
+          <li><svg class="i"><use href="#i-check"/></svg>{{landing.models.chat_3}}</li>
+        </ul>
+        <div class="ep"><code><b>POST</b>/v1/chat/completions</code></div>
+      </article>
+      <article class="model m-image">
+        <div class="top"><span class="ic"><svg class="i"><use href="#i-image"/></svg></span><span class="kind">{{common.kind.image}}</span></div>
+        <h3>muse-image</h3>
+        <p>{{landing.models.image_text}}</p>
+        <ul>
+          <li><svg class="i"><use href="#i-check"/></svg>{{landing.models.image_1}}</li>
+          <li><svg class="i"><use href="#i-check"/></svg>{{landing.models.image_2}}</li>
+          <li><svg class="i"><use href="#i-check"/></svg>{{landing.models.image_3}}</li>
+          <li><svg class="i"><use href="#i-check"/></svg>{{landing.models.image_4}}</li>
+        </ul>
+        <div class="ep"><code><b>POST</b>/v1/images/generations</code><code><b>POST</b>/v1/images/edits</code></div>
+      </article>
+      <article class="model m-video">
+        <div class="top"><span class="ic"><svg class="i"><use href="#i-video"/></svg></span><span class="kind">{{common.kind.video}}</span></div>
+        <h3>muse-video</h3>
+        <p>{{landing.models.video_text}}</p>
+        <ul>
+          <li><svg class="i"><use href="#i-check"/></svg>{{landing.models.video_1}}</li>
+          <li><svg class="i"><use href="#i-check"/></svg>{{landing.models.video_2}}</li>
+          <li><svg class="i"><use href="#i-check"/></svg>{{landing.models.video_3}}</li>
+        </ul>
+        <div class="ep"><code><b>POST</b>/v1/videos</code></div>
+      </article>
+    </div>
+    <div class="alias-note">
+      <svg class="i"><use href="#i-info"/></svg>
+      <div>{{landing.models.alias_note}}</div>
+    </div>
+  </div>
+</section>
+
+<section class="block alt" id="pricing">
+  <div class="wrap">
+    <div class="section-head center">
+      <div class="kicker">{{common.nav.pricing}}</div>
+      <h2>{{landing.pricing.title}}</h2>
+      <p>{{landing.pricing.lede}}</p>
+    </div>
+    <div class="plans">
+      <article class="plan featured">
+        <span class="badge">{{landing.pricing.badge}}</span>
+        <h3>{{landing.pricing.image_name}}</h3>
+        <p class="for">muse-image</p>
+        <div class="price"><b>{{price.image}}</b><span>{{landing.pricing.per_image}}</span></div>
+        <ul>
+          <li><svg class="i"><use href="#i-check"/></svg><span>{{landing.pricing.image_1}}</span></li>
+          <li><svg class="i"><use href="#i-check"/></svg><span>{{landing.pricing.image_2}}</span></li>
+          <li><svg class="i"><use href="#i-check"/></svg><span>{{landing.pricing.image_3}}</span></li>
+        </ul>
+        <a class="btn primary" href="/billing">{{common.cta.top_up}}</a>
+      </article>
+      <article class="plan">
+        <h3>{{landing.pricing.video_name}}</h3>
+        <p class="for">muse-video</p>
+        <div class="price"><b>{{price.video_second}}</b><span>{{landing.pricing.per_second}}</span></div>
+        <span class="unit">{{landing.pricing.video_unit}}</span>
+        <ul>
+          <li><svg class="i"><use href="#i-check"/></svg><span>{{landing.pricing.video_1}}</span></li>
+          <li><svg class="i"><use href="#i-check"/></svg><span>{{landing.pricing.video_2}}</span></li>
+          <li><svg class="i"><use href="#i-check"/></svg><span>{{landing.pricing.video_3}}</span></li>
+        </ul>
+        <a class="btn" href="/billing">{{common.cta.top_up}}</a>
+      </article>
+      <article class="plan">
+        <h3>{{landing.pricing.chat_name}}</h3>
+        <p class="for">muse-chat</p>
+        <div class="price"><b>{{price.chat_input}}</b><span>{{landing.pricing.per_mtok_in}}</span></div>
+        <span class="unit">{{landing.pricing.chat_unit}}</span>
+        <ul>
+          <li><svg class="i"><use href="#i-check"/></svg><span>{{landing.pricing.chat_1}}</span></li>
+          <li><svg class="i"><use href="#i-check"/></svg><span>{{landing.pricing.chat_2}}</span></li>
+          <li><svg class="i"><use href="#i-check"/></svg><span>{{landing.pricing.chat_3}}</span></li>
+        </ul>
+        <a class="btn" href="/billing">{{common.cta.top_up}}</a>
+      </article>
+    </div>
+    <div class="examples">
+      <div>{{landing.pricing.example_head}}</div>
+      <div><b>{{ex.images}}</b>{{landing.pricing.example_images}}</div>
+      <div><b>{{ex.video_clips}}</b>{{landing.pricing.example_videos}}</div>
+      <div><b>{{ex.chat_mtok}}</b>{{landing.pricing.example_chat}}</div>
+    </div>
+    <p class="price-note">{{landing.pricing.note}}</p>
+  </div>
+</section>
+
+<section class="block" id="how">
+  <div class="wrap">
+    <div class="section-head center">
+      <div class="kicker">{{common.nav.how}}</div>
+      <h2>{{landing.how.title}}</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <h3>{{landing.how.s1_title}}</h3>
+        <p>{{landing.how.s1_text}}</p>
+      </div>
+      <div class="step">
+        <h3>{{landing.how.s2_title}}</h3>
+        <p>{{landing.how.s2_text}}</p>
+      </div>
+      <div class="step">
+        <h3>{{landing.how.s3_title}}</h3>
+        <p>{{landing.how.s3_text}}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block alt" id="faq">
+  <div class="wrap">
+    <div class="section-head center">
+      <div class="kicker">FAQ</div>
+      <h2>{{landing.faq.title}}</h2>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary>{{landing.faq.q_code}}</summary>
+        <p>{{landing.faq.a_code}}</p>
+      </details>
+      <details>
+        <summary>{{landing.faq.q_billing}}</summary>
+        <p>{{landing.faq.a_billing}}</p>
+      </details>
+      <details>
+        <summary>{{landing.faq.q_balance}}</summary>
+        <p>{{landing.faq.a_balance}}</p>
+      </details>
+      <details>
+        <summary>{{landing.faq.q_time}}</summary>
+        <p>{{landing.faq.a_time}}</p>
+      </details>
+      <details>
+        <summary>{{landing.faq.q_storage}}</summary>
+        <p>{{landing.faq.a_storage}}</p>
+      </details>
+      <details>
+        <summary>{{landing.faq.q_apps}}</summary>
+        <p>{{landing.faq.a_apps}}</p>
+      </details>
+      <details>
+        <summary>{{landing.faq.q_keys}}</summary>
+        <p>{{landing.faq.a_keys}}</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="contact">
+  <div class="wrap">
+    <div class="contact">
+      <div>
+        <div class="kicker" style="color:#7fe3d4">{{common.cta.get_key}}</div>
+        <h2>{{landing.contact.title}}</h2>
+        <p>{{landing.contact.text}}</p>
+      </div>
+      <div class="channels">
+        <a class="channel" href="/billing">
+          <span class="ic"><svg class="i"><use href="#i-wallet"/></svg></span>
+          <span>{{landing.contact.buy_label}}<small>{{landing.contact.buy_text}}</small></span>
+          <svg class="i arrow"><use href="#i-arrow"/></svg>
+        </a>
+        <a class="channel" href="mailto:{{support_email}}?subject=Muse%20API">
+          <span class="ic"><svg class="i"><use href="#i-mail"/></svg></span>
+          <span>{{landing.contact.email_label}}<small>{{support_email}}</small></span>
+          <svg class="i arrow"><use href="#i-arrow"/></svg>
+        </a>
+        <a class="channel" href="/docs">
+          <span class="ic"><svg class="i"><use href="#i-book"/></svg></span>
+          <span>{{landing.contact.docs_label}}<small>{{landing.contact.docs_text}}</small></span>
+          <svg class="i arrow"><use href="#i-arrow"/></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="/"><span class="glyph" aria-hidden="true">M</span>Muse API</a>
+    <span>© <span id="year">2026</span> ISEMI</span>
+    <nav aria-label="{{common.footer.label}}">
+      <a href="#models">{{common.nav.models}}</a>
+      <a href="#pricing">{{common.nav.pricing}}</a>
+      <a href="/docs">{{common.nav.docs}}</a>
+      <a href="mailto:{{support_email}}">{{common.footer.support}}</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+(() => {
+  // Code samples name the production host; show whatever host served this page.
+  const origin = location.origin;
+  const PROD = "https://muse.isemi.io";
+  if (/^https?:/.test(origin) && origin !== PROD) {
+    document.querySelectorAll(".base").forEach(el => { el.textContent = origin; });
+    document.querySelectorAll("pre code").forEach(el => { el.textContent = el.textContent.split(PROD).join(origin); });
+  }
+  document.getElementById("year").textContent = new Date().getFullYear();
+  // Keep the section in view when switching language.
+  document.querySelectorAll(".lang a").forEach(a => a.addEventListener("click", () => { a.href += location.hash; }));
+
+  // Minimal syntax colouring for the code samples.
+  const KW = {
+    python: "from|import|as|def|return|for|in|if|else|with|await|async|True|False|None|print",
+    js: "import|from|const|let|await|async|new|for|of|if|else|return|true|false|null|console",
+    bash: "curl",
+  };
+  const esc = s => s.replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
+  function highlight(src, lang) {
+    const alts = [
+      ["str", String.raw`"(?:[^"\\\n]|\\.)*"|'(?:[^'\\]|\\.)*'`],
+      ["com", lang === "js" ? String.raw`\/\/[^\n]*` : String.raw`(?:^|[ \t])#[^\n]*`],
+      ["flag", lang === "bash" ? String.raw`[ \t]-{1,2}[A-Za-z][\w-]*|\$[A-Z_][A-Z0-9_]*` : null],
+      ["kw", KW[lang] ? String.raw`\b(?:${KW[lang]})\b` : null],
+      ["num", String.raw`\b\d+(?:\.\d+)?\b`],
+    ].filter(a => a[1]);
+    const re = new RegExp(alts.map(a => `(${a[1]})`).join("|"), "gm");
+    let out = "", last = 0, m;
+    while ((m = re.exec(src))) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      const kind = alts[m.slice(1).findIndex(Boolean)][0];
+      out += esc(src.slice(last, m.index)) + `<span class="tok-${kind}">${esc(m[0])}</span>`;
+      last = m.index + m[0].length;
+    }
+    return out + esc(src.slice(last));
+  }
+  document.querySelectorAll("pre[data-lang] code").forEach(el => {
+    try { el.innerHTML = highlight(el.textContent, el.parentElement.dataset.lang); } catch {}
+  });
+
+  // Hero code tabs + copy.
+  const win = document.getElementById("hero-code");
+  const tabs = win.querySelectorAll(".tab");
+  tabs.forEach(tab => tab.addEventListener("click", () => {
+    tabs.forEach(t => t.setAttribute("aria-selected", String(t === tab)));
+    win.querySelectorAll("pre").forEach(p => { p.hidden = p.dataset.pane !== tab.dataset.tab; });
+  }));
+  win.querySelector(".copy").addEventListener("click", async e => {
+    const pre = win.querySelector("pre:not([hidden])");
+    try { await navigator.clipboard.writeText(pre.textContent); } catch { return; }
+    const btn = e.currentTarget, html = btn.innerHTML;
+    btn.innerHTML = '<svg class="i"><use href="#i-check"/></svg>';
+    setTimeout(() => { btn.innerHTML = html; }, 1400);
+  });
+
+  const nav = document.getElementById("nav");
+  const onScroll = () => nav.classList.toggle("scrolled", scrollY > 8);
+  addEventListener("scroll", onScroll, {passive: true});
+  onScroll();
+})();
+</script>
+</body>
+</html>

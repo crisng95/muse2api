@@ -25,6 +25,9 @@ log = logging.getLogger(__name__)
 
 KEY_PREFIX = "m2a-"
 _DISPLAY_LEN = 8
+# Format version of keys.json, kept in a file of its own so that an older release
+# rewriting keys.json (rollback) cannot drop it. 2 = keys carry "unlimited".
+_VERSION = "2"
 
 
 def hash_key(key: str) -> str:
@@ -44,6 +47,8 @@ class ApiKey(BaseModel):
     last_used_at: float = 0.0
     revoked: bool = False
     note: str = ""
+    # Not charged for requests (see services/billing.py).
+    unlimited: bool = False
 
     def public(self) -> dict:
         """Serialisable view without the hash."""
@@ -53,6 +58,7 @@ class ApiKey(BaseModel):
 class KeyStore:
     def __init__(self, path: Path) -> None:
         self.path = path
+        self.version_file = path.with_name(path.stem + ".version")
         self._keys: dict[str, ApiKey] = {}
         self._lock = asyncio.Lock()
         self._dirty = False
@@ -61,8 +67,24 @@ class KeyStore:
         if not self.path.is_file():
             return
         raw = await asyncio.to_thread(self.path.read_text, encoding="utf-8")
-        if raw.strip():
-            self._keys = {k.id: k for k in (ApiKey.model_validate(i) for i in json.loads(raw))}
+        if not raw.strip():
+            return
+        items = json.loads(raw)
+        # One-time billing migration, keyed on the version file rather than on the
+        # field: keys from before billing stay free. Once migrated, a key without
+        # the field (say, after a rollback rewrote the file) loads as billed.
+        migrate = not self.version_file.is_file()
+        migrated = [i for i in items if "unlimited" not in i] if migrate else []
+        for item in migrated:
+            item["unlimited"] = True
+        self._keys = {k.id: k for k in (ApiKey.model_validate(i) for i in items)}
+        if migrate:
+            log.info("marked %d pre-billing key(s) unlimited", len(migrated))
+            try:
+                await self.save()
+            except OSError:
+                # Retried on the next start; until then the keys stay unlimited in memory.
+                log.exception("failed to write migrated %s", self.path)
 
     def all(self) -> list[ApiKey]:
         return sorted(self._keys.values(), key=lambda k: k.created_at)
@@ -131,3 +153,5 @@ class KeyStore:
             if os.path.exists(tmp):
                 os.unlink(tmp)
             raise
+        if not self.version_file.is_file():
+            self.version_file.write_text(_VERSION + "\n", encoding="utf-8")

@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
 
+from websockets.exceptions import WebSocketException
+
 from ...accounts.model import Account
 from ...config import Settings
 from ...core.prompt import followup_text
@@ -103,6 +105,7 @@ class BrowserDriver(MuseDriver):
         self._opening: dict[str, int] = {}
         self._tab_cond = asyncio.Condition()
         self._ctx_lock = asyncio.Lock()
+        self._browser_lock = asyncio.Lock()
 
     # ------------------------------------------------------------ lifecycle
     async def startup(self) -> None:
@@ -123,6 +126,34 @@ class BrowserDriver(MuseDriver):
             await self._browser.close()
         if self._chromium:
             await self._chromium.stop()
+
+    async def _browser_session(self) -> CDPSession:
+        """The browser-level CDP session, reconnecting if its websocket dropped.
+
+        Without this one dead connection fails every request that needs a new tab
+        until restart. Chromium usually keeps running, so ``start()`` reattaches and
+        its tabs survive; if Chromium itself died, it launches a new one.
+        """
+        async with self._browser_lock:
+            if self._browser and not self._browser.closed:
+                return self._browser
+            assert self._chromium
+            if self._browser:
+                log.warning("browser CDP connection lost (%s); reconnecting",
+                            self._browser.close_reason)
+                await self._browser.close()
+            try:
+                self._browser = await CDPSession.connect(await self._chromium.start())
+                live = await self._browser.send("Target.getBrowserContexts")
+            except Exception as exc:  # noqa: BLE001
+                raise UpstreamError(f"browser unavailable: {exc}") from exc
+            # A relaunched Chromium has none of the old contexts; recreate them on demand.
+            ids = set(live.get("browserContextIds", []))
+            for account_id, context_id in list(self._contexts.items()):
+                if context_id not in ids:
+                    del self._contexts[account_id]
+            log.info("browser CDP connection restored")
+            return self._browser
 
     async def health(self) -> dict[str, Any]:
         ok = self._browser is not None and not self._browser.closed
@@ -192,31 +223,38 @@ class BrowserDriver(MuseDriver):
         async with self._ctx_lock:
             if ctx := self._contexts.get(account.id):
                 return ctx
-            assert self._browser
-            res = await self._browser.send("Target.createBrowserContext", {"disposeOnDetach": False})
+            browser = await self._browser_session()
+            res = await browser.send("Target.createBrowserContext", {"disposeOnDetach": False})
             self._contexts[account.id] = res["browserContextId"]
             return res["browserContextId"]
 
     async def _open_tab(self, account: Account) -> _Tab:
         if missing := muse.missing_session_cookies(account.cookies):
             raise UpstreamAuthError(f"account is missing session cookies: {', '.join(missing)}")
-        assert self._browser and self._chromium
-        context_id = await self._context(account)
-        # A window per tab: Chromium throttles background tabs of a shared window,
-        # which made parallel requests on one account run one after another.
-        target = await self._browser.send(
-            "Target.createTarget",
-            {"url": "about:blank", "browserContextId": context_id, "newWindow": True},
-        )
-        target_id = target["targetId"]
-        session = await CDPSession.connect(
-            f"ws://127.0.0.1:{self._chromium.port}/devtools/page/{target_id}"
-        )
-        for domain in ("Page", "Runtime", "Network"):
-            await session.send(f"{domain}.enable")
-        await session.send("Emulation.setFocusEmulationEnabled", {"enabled": True})
-        await session.send("Page.setWebLifecycleState", {"state": "active"})
-        await self._set_cookies(session, account)
+        assert self._chromium
+        try:
+            context_id = await self._context(account)
+            # A window per tab: Chromium throttles background tabs of a shared window,
+            # which made parallel requests on one account run one after another.
+            target = await (await self._browser_session()).send(
+                "Target.createTarget",
+                {"url": "about:blank", "browserContextId": context_id, "newWindow": True},
+            )
+            target_id = target["targetId"]
+            session = await CDPSession.connect(
+                f"ws://127.0.0.1:{self._chromium.port}/devtools/page/{target_id}"
+            )
+            try:
+                for domain in ("Page", "Runtime", "Network"):
+                    await session.send(f"{domain}.enable")
+                await session.send("Emulation.setFocusEmulationEnabled", {"enabled": True})
+                await session.send("Page.setWebLifecycleState", {"state": "active"})
+                await self._set_cookies(session, account)
+            except BaseException:
+                await session.close()
+                raise
+        except (CDPError, OSError, asyncio.TimeoutError, WebSocketException) as exc:
+            raise UpstreamError(f"browser error: {exc}") from exc
         return _Tab(account.id, context_id, target_id, session)
 
     async def _close_tab(self, tab: _Tab) -> None:
@@ -521,6 +559,10 @@ class BrowserDriver(MuseDriver):
                 else:
                     stable += 1
                     if (not st.get("generating") and stable >= STABLE_POLLS_DONE) or stable >= STABLE_POLLS_FORCE:
+                        # Raised even though the text already went out, so the reply
+                        # ends as an error (and is not billed) rather than as an answer.
+                        if dom.is_glitch_reply(text):
+                            raise UpstreamGlitch(f"muse.ai failed while responding: {text[:200]}")
                         finished = True
                         return
         except CDPError as exc:

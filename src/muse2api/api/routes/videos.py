@@ -6,8 +6,9 @@ from ...core.media import load_image_ref
 from ...core.models import resolve_model
 from ...drivers.base import InputImage, VideoRequest
 from ...errors import NotFound
+from ...services.billing import task_cost_usd, usd
 from ...services.container import Services
-from ...services.tasks import Task
+from ...services.tasks import Task, new_task_id
 from ..deps import get_services, public_base, require_api_key
 from ..schemas import VideoCreateRequest
 
@@ -24,6 +25,7 @@ def _task_view(task: Task) -> dict:
         "model": task.request.get("model"),
         "result": task.result,
         "error": task.error,
+        "cost_usd": task_cost_usd(task),
     }
 
 
@@ -46,9 +48,21 @@ async def create_video(body: VideoCreateRequest, request: Request,
         return {"url": f"{base}/v1/media/{name}", "mime": result.mime,
                 "width": result.width, "height": result.height}
 
+    # Billed on the requested duration, reserved before any upstream work; the
+    # task's on_finish hook refunds a failure.
+    seconds = body.duration or body.seconds
+    cost = svc.billing.video_cost(seconds)
     request_meta = {"model": spec.id, "prompt": body.prompt, "size": body.size,
-                    "duration": body.duration or body.seconds, "has_first_frame": bool(first_frame)}
-    task = svc.tasks.submit("video", request_meta, runner)
+                    "duration": seconds, "has_first_frame": bool(first_frame),
+                    "cost_usd": usd(cost)}
+    task_id = new_task_id()
+    await svc.billing.reserve(request.state.key_id, cost, task_id,
+                              f"video {seconds or svc.settings.video_default_seconds}s")
+    try:
+        task = svc.tasks.submit("video", request_meta, runner, task_id=task_id)
+    except BaseException:
+        await svc.billing.refund(task_id)
+        raise
     request.state.task_id = task.id
     return _task_view(task)
 

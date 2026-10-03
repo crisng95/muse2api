@@ -52,6 +52,7 @@ def create_app(settings: Settings | None = None, driver: MuseDriver | None = Non
         await services.requests.open()
         await services.requests.prune(settings.request_log_retention_days)
         await services.requests.backfill_tasks(services.tasks.list(limit=services.tasks.max_kept))
+        await services.billing.reconcile(services.tasks.list(limit=services.tasks.max_kept))
         await services.driver.startup()
         housekeeping = asyncio.create_task(_housekeeping(services))
         keepalive = None
@@ -71,9 +72,13 @@ def create_app(settings: Settings | None = None, driver: MuseDriver | None = Non
             await services.tasks.shutdown()
             await services.driver.shutdown()
             await services.keys.flush()
+            await services.billing.drain()
             await services.requests.close()
 
-    app = FastAPI(title="muse2api", version=__version__, lifespan=lifespan)
+    # No auto-generated /docs, /redoc or /openapi.json: the schema would list /admin/*.
+    # /docs serves the hand-written customer docs instead (api/routes/pages.py).
+    app = FastAPI(title="muse2api", version=__version__, lifespan=lifespan,
+                  docs_url=None, redoc_url=None, openapi_url=None)
     app.state.services = services
 
     @app.exception_handler(Muse2APIError)

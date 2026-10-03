@@ -33,6 +33,21 @@ class Unauthorized(Muse2APIError):
     code = "invalid_api_key"
 
 
+class InsufficientBalance(Muse2APIError):
+    """The key's prepaid credit does not cover the request. 402 rather than 429,
+    which OpenAI SDKs retry automatically."""
+
+    status_code = 402
+    error_type = "insufficient_quota"
+    code = "insufficient_balance"
+
+
+class TooManyRequests(Muse2APIError):
+    status_code = 429
+    error_type = "rate_limit_error"
+    code = "rate_limited"
+
+
 class NotFound(Muse2APIError):
     status_code = 404
     error_type = "invalid_request_error"
@@ -45,6 +60,21 @@ class FeatureNotImplemented(Muse2APIError):
     status_code = 501
     error_type = "not_implemented"
     code = "not_implemented"
+
+
+# --- payments (/billing) ---
+class CheckoutUnavailable(Muse2APIError):
+    status_code = 503
+    error_type = "server_error"
+    code = "checkout_unavailable"
+
+
+class PaymentError(Muse2APIError):
+    """PayPal failed, or a payment did not match what was ordered."""
+
+    status_code = 502
+    error_type = "payment_error"
+    code = "payment_error"
 
 
 # --- capacity ---

@@ -12,7 +12,10 @@ from ..core.matting import Matting
 from ..core.media import MediaStore
 from ..drivers.base import MuseDriver
 from ..drivers.registry import create_driver
+from .billing import REFUNDABLE, Billing
 from .gateway import Gateway
+from .payments import Payments
+from .paypal import PayPalClient
 from .request_log import RequestLog, current_record
 from .tasks import Task, TaskManager
 
@@ -28,6 +31,8 @@ class Services:
     matting: Matting
     keys: KeyStore
     requests: RequestLog
+    billing: Billing
+    payments: Payments
 
     @classmethod
     def build(cls, settings: Settings, driver: MuseDriver | None = None) -> Services:
@@ -41,13 +46,22 @@ class Services:
             acquire_timeout=settings.pool_acquire_timeout,
         )
         requests = RequestLog(settings.requests_db)
+        keys = KeyStore(settings.keys_file)
+        billing = Billing(settings, keys, requests)
 
         async def record_outcome(task: Task) -> None:
             record = current_record.get()
+            # Failed work is free: give back what the submit reserved.
+            refunded = 0
+            if task.status in REFUNDABLE:
+                refunded = await billing.refund(task.id)
+            else:
+                await billing.settle(task.id)
             await requests.finish_task(task.id, task.status.value, task.updated_at,
                                        (task.error or {}).get("message"),
                                        record.get("account_id") if record else None,
-                                       record.get("attempt_errors") if record else None)
+                                       record.get("attempt_errors") if record else None,
+                                       cost_micro=0 if refunded else None)
 
         return cls(
             settings=settings,
@@ -57,6 +71,8 @@ class Services:
             tasks=TaskManager(settings.tasks_file, on_finish=record_outcome),
             media=MediaStore(settings.media_dir),
             matting=Matting(settings.matting_model),
-            keys=KeyStore(settings.keys_file),
+            keys=keys,
             requests=requests,
+            billing=billing,
+            payments=Payments(settings, keys, billing, PayPalClient(settings)),
         )

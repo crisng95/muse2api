@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import mimetypes
 import time
+import uuid
 from dataclasses import replace
 
 from fastapi import APIRouter, Depends, Request
@@ -13,8 +14,9 @@ from ...core.media import load_image_ref
 from ...core.models import resolve_model
 from ...drivers.base import ImageRequest, InputImage, MediaResult
 from ...errors import InvalidRequest, NotFound
+from ...services.billing import task_cost_usd, usd
 from ...services.container import Services
-from ...services.tasks import Task
+from ...services.tasks import Task, new_task_id
 from ..deps import get_services, public_base, require_api_key
 from ..schemas import ImageGenerationRequest
 
@@ -48,6 +50,7 @@ def _task_view(task: Task) -> dict:
         "model": task.request.get("model"),
         "result": task.result,
         "error": task.error,
+        "cost_usd": task_cost_usd(task),
     }
 
 
@@ -56,13 +59,25 @@ async def _generate(body: ImageGenerationRequest, refs: list[InputImage],
     request.state.model = body.model or resolve_model(body.model, "image").id
     if len(refs) > MAX_REFERENCE_IMAGES:
         raise InvalidRequest(f"at most {MAX_REFERENCE_IMAGES} reference images are supported")
+    # Charged up front, before any upstream work, and refunded if the work fails.
+    cost = svc.billing.image_cost(body.n)
     if body.async_:
-        return _submit(body, refs, request, svc)
-    return await _run(body, refs, public_base(request), svc)
+        return await _submit(body, refs, request, svc, cost)
+    ref = "img_" + uuid.uuid4().hex[:16]
+    reserved = await svc.billing.reserve(request.state.key_id, cost, ref, f"{body.n} image(s)")
+    try:
+        result = await _run(body, refs, public_base(request), svc)
+    except BaseException:
+        if reserved:
+            await svc.billing.refund(ref)
+        raise
+    if reserved:
+        await svc.billing.settle(ref)
+    return {**result, "cost_usd": usd(cost)}
 
 
-def _submit(body: ImageGenerationRequest, refs: list[InputImage], request: Request,
-            svc: Services) -> dict:
+async def _submit(body: ImageGenerationRequest, refs: list[InputImage], request: Request,
+                  svc: Services, cost: int) -> dict:
     """Run the generation as a background task; results are stored as media URLs."""
     spec = resolve_model(body.model, "image")
     body = body.model_copy(update={"response_format": "url"})  # keep base64 out of tasks.json
@@ -72,8 +87,15 @@ def _submit(body: ImageGenerationRequest, refs: list[InputImage], request: Reque
         return await _run(body, refs, base, svc)
 
     meta = {"model": spec.id, "prompt": body.prompt, "size": body.size, "n": body.n,
-            "references": len(refs)}
-    task = svc.tasks.submit("image", meta, runner)
+            "references": len(refs), "cost_usd": usd(cost)}
+    # Reserved under the task id; the task's on_finish hook refunds a failure.
+    task_id = new_task_id()
+    await svc.billing.reserve(request.state.key_id, cost, task_id, f"{body.n} image(s)")
+    try:
+        task = svc.tasks.submit("image", meta, runner, task_id=task_id)
+    except BaseException:
+        await svc.billing.refund(task_id)
+        raise
     request.state.task_id = task.id
     return _task_view(task)
 
@@ -111,7 +133,7 @@ async def edit_images(request: Request, svc: Services = Depends(get_services)) -
     """
     form = await request.form()
     if form.get("mask") is not None:
-        raise InvalidRequest("mask is not supported; muse.ai cannot inpaint a region")
+        raise InvalidRequest("mask is not supported; region inpainting is not available")
     files = [f for key in ("image", "image[]") for f in form.getlist(key)
              if isinstance(f, UploadFile)]
     if not files:

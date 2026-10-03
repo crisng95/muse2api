@@ -245,3 +245,82 @@ async def test_quota_hint_only_counts_in_the_finished_reply(driver):
              "lastText": "You've reached your usage limit. Try again later.", "generating": False}
     with pytest.raises(UpstreamQuotaError, match="usage limit"):
         await driver._state(_media_tab([quota]))
+
+
+class _FakeBrowser:
+    def __init__(self, contexts: list[str]) -> None:
+        self.closed = False
+        self.close_reason = ""
+        self.contexts = contexts
+
+    async def send(self, method: str, params: dict | None = None, timeout: float = 30.0) -> dict:
+        assert method == "Target.getBrowserContexts"
+        return {"browserContextIds": self.contexts}
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class _FakeChromium:
+    port = 0
+
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.starts = 0
+
+    async def start(self) -> str:
+        self.starts += 1
+        if self.fail:
+            raise RuntimeError("Chromium did not expose a DevTools endpoint")
+        return "ws://fake"
+
+
+async def test_dropped_browser_connection_is_reopened(tmp_path, monkeypatch):
+    from muse2api.drivers.browser import driver as mod
+
+    drv = BrowserDriver(Settings(_env_file=None, data_dir=tmp_path))
+    dead = _FakeBrowser([])
+    dead.closed, dead.close_reason = True, "closed by peer (code 1006)"
+    drv._browser, drv._chromium = dead, _FakeChromium()
+    drv._contexts = {"kept": "ctx-1", "gone": "ctx-2"}
+    fresh = _FakeBrowser(["ctx-1"])
+
+    async def connect(url: str):
+        return fresh
+
+    monkeypatch.setattr(mod.CDPSession, "connect", connect)
+    assert await drv._browser_session() is fresh
+    assert drv._contexts == {"kept": "ctx-1"}  # contexts Chromium no longer has are dropped
+    assert await drv._browser_session() is fresh and drv._chromium.starts == 1
+
+
+async def test_unreachable_browser_fails_over_instead_of_crashing(tmp_path):
+    from muse2api.errors import UpstreamError
+
+    drv = BrowserDriver(Settings(_env_file=None, data_dir=tmp_path))
+    dead = _FakeBrowser([])
+    dead.closed = True
+    drv._browser, drv._chromium = dead, _FakeChromium(fail=True)
+    with pytest.raises(UpstreamError, match="browser unavailable") as err:
+        await drv._browser_session()
+    assert err.value.retryable
+
+
+async def test_chat_reply_that_is_only_the_agent_error_raises(driver, fast, monkeypatch):
+    from muse2api.drivers.base import ChatRequest
+    from muse2api.errors import UpstreamGlitch
+
+    oops = {"agentCount": 1, "generating": False,
+            "lastText": "Sorry, I ran into a problem while responding. Please try again."}
+    tab = _media_tab([oops])
+
+    async def begin(account, req):
+        return tab, {"agentCount": 0, "lastText": ""}
+
+    monkeypatch.setattr(driver, "_begin_chat", begin)
+    got = []
+    with pytest.raises(UpstreamGlitch):
+        async for delta in driver.chat_stream(ACC, ChatRequest(prompt="hi", model="m")):
+            got.append(delta)
+    assert "".join(got) == oops["lastText"]  # streamed, but it ends as an error
+    assert not tab.busy

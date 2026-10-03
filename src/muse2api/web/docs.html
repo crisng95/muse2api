@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Muse API Docs</title>
+<meta name="description" content="{{docs.meta.description}}">
+{{hreflang}}
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%228%22 fill=%22%230b6b61%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #ffffff; --panel: #ffffff; --panel-2: #f2f4f1; --panel-3: #e8ebe6; --border: #e3e7e0; --border-strong: #cbd1c7;
+  --text: #13181b; --muted: #59636a; --faint: #8a9298;
+  --accent: #0b6b61; --accent-hover: #095a52; --accent-text: #ffffff; --accent-soft: #e0f1ed; --accent-ink: #0a5f56;
+  --code-bg: #0e1417; --code-panel: #141c20; --code-border: #222c31; --code-text: #d6dfe2; --code-muted: #71808a;
+  --tok-str: #8fd6a8; --tok-kw: #7fc4f5; --tok-num: #f2b56b; --tok-com: #6b7a83; --tok-flag: #e6a0f0; --tok-key: #b9c7ff;
+  --get: #1d7a45; --get-bg: #e2f3e8; --post: #2b5f9e; --post-bg: #e3edf9;
+  --warn: #8a5300; --warn-bg: #fdf3df; --warn-line: #e3a23b;
+  --info-bg: #eaf4f2; --info-line: #0b6b61;
+  --sans: "Be Vietnam Pro", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0d1113; --panel: #12181b; --panel-2: #172024; --panel-3: #1e282d; --border: #222b30; --border-strong: #34414a;
+    --text: #e4e9eb; --muted: #97a2a8; --faint: #6b777e;
+    --accent: #2fbfab; --accent-hover: #45d0bd; --accent-text: #04201c; --accent-soft: #10302c; --accent-ink: #4fd3c0;
+    --code-bg: #080b0d; --code-panel: #0f1417; --code-border: #1d262b;
+    --get: #4cc488; --get-bg: #11291d; --post: #7fb0ec; --post-bg: #142337;
+    --warn: #f0b04f; --warn-bg: #2a2110; --warn-line: #c98a2a;
+    --info-bg: #0f2522; --info-line: #2fbfab;
+  }
+}
+
+* { box-sizing: border-box; }
+html { scroll-padding-top: 80px; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 15.5px/1.7 var(--sans); -webkit-font-smoothing: antialiased; }
+a { color: var(--accent-ink); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code, pre, kbd { font-family: var(--mono); }
+svg.i { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---------- top bar ---------- */
+.top { position: sticky; top: 0; z-index: 60; height: 60px; display: flex; align-items: center; gap: 18px; padding: 0 24px; background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: 10px; white-space: nowrap; text-decoration: none; color: var(--text); font-weight: 700; font-size: 16.5px; letter-spacing: -.02em; }
+.glyph { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(140deg, #3fd1bd, #0b6b61); color: #04201c; font: 800 14px/1 var(--sans); }
+.brand .tag { font: 600 12px/1 var(--mono); color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 4px 7px; margin-left: 2px; }
+.top .spacer { flex: 1; }
+.top a.lnk { color: var(--muted); text-decoration: none; font-size: 14.5px; font-weight: 500; }
+.top a.lnk:hover { color: var(--text); }
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: 9px; font: 600 14px/1.2 var(--sans); text-decoration: none; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-text); white-space: nowrap; }
+.btn:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.burger { display: none; background: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px; color: var(--text); cursor: pointer; }
+
+/* ---------- layout ---------- */
+.layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); max-width: 1320px; margin: 0 auto; }
+.toc { position: sticky; top: 60px; height: calc(100vh - 60px); overflow-y: auto; padding: 28px 16px 40px 24px; border-right: 1px solid var(--border); }
+.toc .group { font: 600 11.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .09em; color: var(--faint); margin: 22px 10px 8px; }
+.toc .group:first-child { margin-top: 0; }
+.toc a { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 7px; color: var(--muted); text-decoration: none; font-size: 14.5px; line-height: 1.45; }
+.toc a:hover { color: var(--text); background: var(--panel-2); }
+.toc a.on { color: var(--accent-ink); background: var(--accent-soft); font-weight: 600; }
+.toc a .m { font: 700 10px/1 var(--mono); padding: 3px 5px; border-radius: 4px; letter-spacing: .02em; }
+.m.get { color: var(--get); background: var(--get-bg); } .m.post { color: var(--post); background: var(--post-bg); }
+
+main { min-width: 0; padding: 44px 56px 120px; max-width: 920px; }
+.hero-doc { padding-bottom: 28px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.hero-doc .kicker { font: 600 12.5px/1 var(--mono); color: var(--accent-ink); text-transform: uppercase; letter-spacing: .09em; }
+h1 { font-size: 38px; line-height: 1.15; letter-spacing: -.035em; font-weight: 800; margin: 12px 0 12px; }
+.hero-doc p { font-size: 17px; color: var(--muted); margin: 0; max-width: 40em; }
+.baseurl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 20px; padding: 12px 14px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--border); }
+.baseurl > span { font-size: 13px; color: var(--muted); font-weight: 600; }
+.baseurl code { font-size: 14.5px; font-weight: 600; word-break: break-all; }
+.baseurl button { margin-left: auto; }
+
+section.doc { padding-top: 44px; }
+h2 { font-size: 26px; letter-spacing: -.025em; font-weight: 750; margin: 0 0 12px; line-height: 1.25; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+h3 { font-size: 18px; letter-spacing: -.015em; font-weight: 700; margin: 30px 0 10px; }
+h4 { font: 600 12px/1 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 24px 0 10px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 22px; }
+li { margin: 4px 0; }
+.anchor { color: var(--faint); text-decoration: none; font-weight: 500; opacity: 0; transition: opacity .15s; font-size: .8em; }
+h2:hover .anchor, h3:hover .anchor { opacity: 1; }
+:not(pre) > code { font-size: .86em; background: var(--panel-2); border: 1px solid var(--border); padding: 1px 6px; border-radius: 6px; word-break: break-word; }
+
+.endpoint { display: inline-flex; align-items: center; gap: 10px; font: 600 14px/1 var(--mono); padding: 9px 12px; border-radius: 9px; background: var(--panel-2); border: 1px solid var(--border); margin: 2px 6px 14px 0; word-break: break-all; }
+.endpoint .m { font-size: 11.5px; padding: 4px 7px; border-radius: 5px; }
+
+/* params */
+.params { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 0 0 18px; }
+.param { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 6px 20px; padding: 13px 16px; border-top: 1px solid var(--border); }
+.param:first-child { border-top: 0; }
+.param .name { font: 600 13.5px/1.5 var(--mono); word-break: break-word; }
+.param .type { display: block; font: 500 12px/1.5 var(--mono); color: var(--muted); }
+.param .req { font: 600 10.5px/1 var(--sans); text-transform: uppercase; letter-spacing: .06em; color: #c2410c; margin-left: 6px; }
+@media (prefers-color-scheme: dark) { .param .req { color: #fb923c; } }
+.param .desc { font-size: 14.5px; color: var(--text); }
+.param .desc p { margin: 0 0 6px; } .param .desc p:last-child { margin: 0; }
+.param .def { color: var(--muted); font-size: 13.5px; }
+
+/* tables */
+.tbl { width: 100%; border-collapse: separate; border-spacing: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin: 0 0 18px; font-size: 14.5px; }
+.tbl th, .tbl td { text-align: left; padding: 10px 14px; border-top: 1px solid var(--border); vertical-align: top; }
+.tbl thead th { border-top: 0; background: var(--panel-2); font: 600 12px/1.4 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.tbl td code { white-space: nowrap; }
+.tbl-wrap { overflow-x: auto; margin: 0 0 18px; }
+.tbl-wrap .tbl { margin: 0; min-width: 560px; }
+
+/* callouts */
+.note { display: flex; gap: 12px; padding: 13px 16px; border-radius: 10px; margin: 0 0 18px; background: var(--info-bg); border-left: 3px solid var(--info-line); font-size: 14.5px; }
+.note.warn { background: var(--warn-bg); border-left-color: var(--warn-line); }
+.note svg { margin-top: 4px; color: var(--info-line); }
+.note.warn svg { color: var(--warn); }
+.note p { margin: 0 0 6px; } .note p:last-child { margin: 0; }
+
+/* code blocks */
+.code { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 12px; margin: 0 0 18px; overflow: hidden; color: var(--code-text); }
+.code .bar { display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 14px; border-bottom: 1px solid var(--code-border); background: var(--code-panel); min-height: 40px; }
+.code .label { font: 500 12.5px/1 var(--mono); color: var(--code-muted); }
+.code .tab { background: none; border: 0; color: var(--code-muted); font: 500 12.5px/1 var(--mono); padding: 7px 10px; border-radius: 7px; cursor: pointer; }
+.code .tab:hover { color: var(--code-text); }
+.code .tab[aria-selected="true"] { background: rgba(255,255,255,.07); color: #fff; }
+.code .copy { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; color: var(--code-muted); cursor: pointer; padding: 6px 8px; border-radius: 6px; font: 500 12px/1 var(--sans); }
+.code .copy:hover { color: #fff; background: rgba(255,255,255,.07); }
+.code pre { margin: 0; padding: 16px 18px; font-size: 13px; line-height: 1.7; overflow-x: auto; tab-size: 4; }
+.tok-str { color: var(--tok-str); } .tok-kw { color: var(--tok-kw); } .tok-num { color: var(--tok-num); } .tok-com { color: var(--tok-com); font-style: italic; } .tok-flag { color: var(--tok-flag); } .tok-key { color: var(--tok-key); }
+
+.status { display: inline-block; font: 600 12px/1 var(--mono); padding: 4px 7px; border-radius: 5px; background: var(--panel-3); }
+.steps-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; font: 600 13px/1 var(--mono); }
+.steps-flow span { padding: 6px 10px; border-radius: 7px; background: var(--panel-2); border: 1px solid var(--border); }
+.steps-flow i { color: var(--faint); font-style: normal; }
+
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 0 0 18px; }
+.card { border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.card h4 { margin: 0 0 8px; color: var(--text); font-size: 12.5px; }
+.card p { margin: 0; font-size: 14.5px; color: var(--muted); }
+
+.foot { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; display: flex; gap: 16px; flex-wrap: wrap; }
+.foot a { color: var(--muted); }
+
+.scrim { display: none; }
+
+/* language menu */
+.lang { position: relative; }
+.lang summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 9px; color: var(--muted); font-size: 14px; font-weight: 500; }
+.lang summary::-webkit-details-marker { display: none; }
+.lang summary:hover, .lang[open] summary { color: var(--text); background: var(--panel-2); }
+.lang ul { position: absolute; right: 0; top: calc(100% + 6px); min-width: 180px; margin: 0; padding: 6px; list-style: none; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 18px 50px rgba(10, 14, 16, .22); z-index: 70; }
+.lang li { margin: 0; }
+.lang li a { display: block; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-size: 14.5px; color: var(--text); }
+.lang li a:hover { background: var(--panel-2); }
+.lang li a[aria-current="true"] { color: var(--accent-ink); font-weight: 600; }
+
+@media (max-width: 1000px) {
+  main { padding: 36px 32px 100px; }
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .burger { display: grid; place-items: center; }
+  .top { padding: 0 16px; gap: 12px; }
+  .top a.lnk { display: none; }
+  .toc { position: fixed; left: 0; top: 60px; bottom: 0; width: 280px; height: auto; z-index: 55; background: var(--bg); transform: translateX(-100%); transition: transform .2s; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+  body.nav-open .toc { transform: none; }
+  body.nav-open .scrim { display: block; position: fixed; inset: 60px 0 0; background: rgba(0,0,0,.35); z-index: 54; }
+  main { padding: 28px 16px 80px; }
+  h1 { font-size: 30px; }
+  h2 { font-size: 23px; }
+  .param { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .grid2 { grid-template-columns: minmax(0, 1fr); }
+  .brand .tag { display: none; }
+  .lang summary span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body data-copy="{{common.copy}}" data-copied="{{common.copied}}">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5 2.5 20h19L12 3.5Z"/><path d="M12 10v4.5M12 17.5h.01"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+</svg>
+
+<header class="top">
+  <button class="burger" id="burger" type="button" aria-label="{{docs.toc.label}}" aria-controls="toc" aria-expanded="false"><svg class="i"><use href="#i-menu"/></svg></button>
+  <a class="brand" href="/"><span class="glyph" aria-hidden="true">M</span>Muse API<span class="tag">docs</span></a>
+  <span class="spacer"></span>
+  <a class="lnk" href="/#models">{{common.nav.models}}</a>
+  <a class="lnk" href="/#pricing">{{common.nav.pricing}}</a>
+  {{lang_menu}}
+  <a class="btn" href="/billing">{{common.cta.get_key}}</a>
+</header>
+<div class="scrim" id="scrim"></div>
+
+<div class="layout">
+<nav class="toc" id="toc" aria-label="{{docs.toc.label}}">
+  <div class="group">{{docs.toc.start}}</div>
+  <a href="#overview">{{docs.toc.overview}}</a>
+  <a href="#quickstart">{{docs.toc.quickstart}}</a>
+  <a href="#auth">{{docs.toc.auth}}</a>
+  <a href="#models">{{common.nav.models}}</a>
+  <a href="#billing">{{docs.toc.billing}}</a>
+  <div class="group">Endpoints</div>
+  <a href="#chat"><span class="m post">POST</span>{{docs.toc.chat}}</a>
+  <a href="#images"><span class="m post">POST</span>{{docs.toc.images}}</a>
+  <a href="#images-edits"><span class="m post">POST</span>{{docs.toc.edits}}</a>
+  <a href="#videos"><span class="m post">POST</span>{{docs.toc.videos}}</a>
+  <a href="#tasks"><span class="m get">GET</span>{{docs.toc.tasks}}</a>
+  <a href="#media"><span class="m get">GET</span>{{docs.toc.media}}</a>
+  <a href="#balance"><span class="m get">GET</span>{{docs.toc.balance}}</a>
+  <a href="#list-models"><span class="m get">GET</span>{{docs.toc.list_models}}</a>
+  <div class="group">{{docs.toc.guides}}</div>
+  <a href="#errors">{{docs.toc.errors}}</a>
+  <a href="#integrations">{{docs.toc.integrations}}</a>
+  <a href="#limits">{{docs.toc.limits}}</a>
+</nav>
+
+<main>
+<div class="hero-doc" id="overview">
+  <div class="kicker">{{docs.hero.kicker}}</div>
+  <h1>Muse API</h1>
+  <p>{{docs.hero.lede}}</p>
+  <div class="baseurl"><span>Base URL</span><code><span class="base">https://muse.isemi.io</span>/v1</code></div>
+</div>
+
+<!-- ============ quickstart ============ -->
+<section class="doc" id="quickstart">
+  <h2>{{docs.toc.quickstart}} <a class="anchor" href="#quickstart">#</a></h2>
+  <ol>
+    <li>{{docs.quickstart.step1}}</li>
+    <li>{{docs.quickstart.step2}}</li>
+    <li>{{docs.quickstart.step3}}</li>
+  </ol>
+  <div class="code" data-tabs>
+    <div class="bar"><button class="tab" data-tab="py">Python</button><button class="tab" data-tab="js">Node.js</button><button class="tab" data-tab="sh">cURL</button></div>
+<pre data-pane="py" data-lang="python"><code>from openai import OpenAI
+
+client = OpenAI(base_url="https://muse.isemi.io/v1", api_key="m2a-your-key")
+
+resp = client.chat.completions.create(
+    model="muse-chat",
+    messages=[{"role": "user", "content": "Write a one-line good-morning message"}],
+)
+print(resp.choices[0].message.content)</code></pre>
+<pre data-pane="js" data-lang="js"><code>import OpenAI from "openai";
+
+const client = new OpenAI({ baseURL: "https://muse.isemi.io/v1", apiKey: "m2a-your-key" });
+
+const resp = await client.chat.completions.create({
+  model: "muse-chat",
+  messages: [{ role: "user", content: "Write a one-line good-morning message" }],
+});
+console.log(resp.choices[0].message.content);</code></pre>
+<pre data-pane="sh" data-lang="bash"><code>curl https://muse.isemi.io/v1/chat/completions \
+  -H "Authorization: Bearer $MUSE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "muse-chat", "messages": [{"role": "user", "content": "Write a one-line good-morning message"}]}'</code></pre>
+  </div>
+</section>
+
+<!-- ============ auth ============ -->
+<section class="doc" id="auth">
+  <h2>{{docs.toc.auth}} <a class="anchor" href="#auth">#</a></h2>
+  <p>{{docs.auth.intro}}</p>
+  <div class="code"><div class="bar"><span class="label">HTTP headers</span></div>
+<pre data-lang="http"><code>Authorization: Bearer m2a-your-key
+# or
+X-Api-Key: m2a-your-key</code></pre></div>
+  <p>{{docs.auth.invalid}}</p>
+  <div class="note warn"><svg class="i"><use href="#i-warn"/></svg><div><p>{{docs.auth.warning}}</p></div></div>
+</section>
+
+<!-- ============ models ============ -->
+<section class="doc" id="models">
+  <h2>{{common.nav.models}} <a class="anchor" href="#models">#</a></h2>
+  <p>{{docs.models.intro}}</p>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>Model</th><th>{{docs.models.col_kind}}</th><th>Endpoint</th><th>{{docs.models.col_caps}}</th></tr></thead>
+    <tbody>
+      <tr><td><code>muse-chat</code></td><td>{{common.kind.chat}}</td><td><code>/v1/chat/completions</code></td><td>{{docs.models.chat_caps}}</td></tr>
+      <tr><td><code>muse-image</code></td><td>{{common.kind.image}}</td><td><code>/v1/images/generations</code><br><code>/v1/images/edits</code></td><td>{{docs.models.image_caps}}</td></tr>
+      <tr><td><code>muse-video</code></td><td>{{common.kind.video}}</td><td><code>/v1/videos</code></td><td>{{docs.models.video_caps}}</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3 id="aliases">{{docs.models.aliases_title}}</h3>
+  <p>{{docs.models.aliases_intro}}</p>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>{{docs.models.col_sent}}</th><th>{{docs.models.col_served}}</th></tr></thead>
+    <tbody>
+      <tr><td><code>gpt-4o</code> · <code>gpt-4o-mini</code> · <code>gpt-4.1</code> · <code>gpt-5</code> · <code>claude-sonnet-4</code> · <code>deepseek-chat</code></td><td><code>muse-chat</code></td></tr>
+      <tr><td><code>dall-e-3</code> · <code>gpt-image-1</code></td><td><code>muse-image</code></td></tr>
+      <tr><td><code>sora</code></td><td><code>muse-video</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>{{docs.models.fallback}}</p>
+</section>
+
+<!-- ============ billing ============ -->
+<section class="doc" id="billing">
+  <h2>{{docs.toc.billing}} <a class="anchor" href="#billing">#</a></h2>
+  <p>{{docs.billing.intro}}</p>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>Model</th><th>{{docs.billing.col_price}}</th><th>{{docs.billing.col_basis}}</th></tr></thead>
+    <tbody>
+      <tr><td><code>muse-image</code></td><td><b>{{price.image}}</b> {{docs.billing.per_image}}</td><td>{{docs.billing.image_basis}}</td></tr>
+      <tr><td><code>muse-video</code></td><td><b>{{price.video_second}}</b> {{docs.billing.per_second}}</td><td>{{docs.billing.video_basis}}</td></tr>
+      <tr><td><code>muse-chat</code></td><td><b>{{price.chat_input}}</b> {{docs.billing.per_mtok_in}}<br><b>{{price.chat_output}}</b> {{docs.billing.per_mtok_out}}</td><td>{{docs.billing.chat_basis}}</td></tr>
+    </tbody>
+  </table></div>
+  <h3 id="billing-how">{{docs.billing.how_title}}</h3>
+  <ul>
+    <li>{{docs.billing.how_media}}</li>
+    <li>{{docs.billing.how_chat}}</li>
+    <li>{{docs.billing.how_free}}</li>
+    <li>{{docs.billing.how_cost}}</li>
+  </ul>
+  <div class="note"><svg class="i"><use href="#i-info"/></svg><div><p>{{docs.billing.tokens_note}}</p></div></div>
+  <p>{{docs.billing.topup}}</p>
+</section>
+
+<!-- ============ chat ============ -->
+<section class="doc" id="chat">
+  <h2>{{docs.toc.chat}} <a class="anchor" href="#chat">#</a></h2>
+  <div class="endpoint"><span class="m post">POST</span>/v1/chat/completions</div>
+  <p>{{docs.chat.intro}}</p>
+
+  <h4>{{docs.params}}</h4>
+  <div class="params">
+    <div class="param"><div class="name">model<span class="type">string</span></div><div class="desc"><p>{{docs.chat.p_model}}</p><p class="def">{{docs.default}}: <code>muse-chat</code></p></div></div>
+    <div class="param"><div class="name">messages<span class="req">{{docs.required}}</span><span class="type">array</span></div><div class="desc"><p>{{docs.chat.p_messages}}</p></div></div>
+    <div class="param"><div class="name">stream<span class="type">boolean</span></div><div class="desc"><p>{{docs.chat.p_stream}}</p><p class="def">{{docs.default}}: <code>false</code></p></div></div>
+    <div class="param"><div class="name">stream_options<span class="type">object</span></div><div class="desc"><p>{{docs.chat.p_stream_options}}</p></div></div>
+    <div class="param"><div class="name">user<span class="type">string</span></div><div class="desc"><p>{{docs.chat.p_user}}</p></div></div>
+    <div class="param"><div class="name">temperature, top_p, max_tokens, tools, tool_choice</div><div class="desc"><p>{{docs.chat.p_ignored}}</p></div></div>
+  </div>
+
+  <h4>Response</h4>
+  <div class="code"><div class="bar"><span class="label">200 OK</span></div>
+<pre data-lang="json"><code>{
+  "id": "chatcmpl-8f2c1e0b9a7d4c3e2f1a0b9c",
+  "object": "chat.completion",
+  "created": 1767225600,
+  "model": "muse-chat",
+  "choices": [
+    {
+      "index": 0,
+      "message": { "role": "assistant", "content": "Good morning — make today a great one!" },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": { "prompt_tokens": 9, "completion_tokens": 10, "total_tokens": 19, "cost_usd": 0.000039 }
+}</code></pre></div>
+  <p>{{docs.chat.usage_note}}</p>
+
+  <h3 id="chat-stream">Streaming</h3>
+  <p>{{docs.chat.stream_intro}}</p>
+  <div class="code" data-tabs>
+    <div class="bar"><button class="tab" data-tab="py">Python</button><button class="tab" data-tab="js">Node.js</button><button class="tab" data-tab="raw">Raw SSE</button></div>
+<pre data-pane="py" data-lang="python"><code>stream = client.chat.completions.create(
+    model="muse-chat",
+    messages=[{"role": "user", "content": "Tell a short story about autumn"}],
+    stream=True,
+)
+for chunk in stream:
+    if chunk.choices and chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="", flush=True)</code></pre>
+<pre data-pane="js" data-lang="js"><code>const stream = await client.chat.completions.create({
+  model: "muse-chat",
+  messages: [{ role: "user", content: "Tell a short story about autumn" }],
+  stream: true,
+});
+for await (const chunk of stream) {
+  process.stdout.write(chunk.choices[0]?.delta?.content ?? "");
+}</code></pre>
+<pre data-pane="raw" data-lang="sse"><code>data: {"id":"chatcmpl-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Autumn"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":" leaves"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]</code></pre>
+  </div>
+  <div class="note"><svg class="i"><use href="#i-info"/></svg><div><p>{{docs.chat.stream_error}}</p></div></div>
+
+  <h3 id="chat-vision">{{docs.chat.vision_title}}</h3>
+  <p>{{docs.chat.vision_intro}}</p>
+  <div class="code"><div class="bar"><span class="label">Python</span></div>
+<pre data-lang="python"><code>resp = client.chat.completions.create(
+    model="muse-chat",
+    messages=[{
+        "role": "user",
+        "content": [
+            {"type": "text", "text": "Describe this photo in two sentences"},
+            {"type": "image_url", "image_url": {"url": "https://example.com/photo.jpg"}},
+        ],
+    }],
+)</code></pre></div>
+</section>
+
+<!-- ============ images ============ -->
+<section class="doc" id="images">
+  <h2>{{docs.toc.images}} <a class="anchor" href="#images">#</a></h2>
+  <div class="endpoint"><span class="m post">POST</span>/v1/images/generations</div>
+  <p>{{docs.images.intro}}</p>
+
+  <h4>{{docs.params}}</h4>
+  <div class="params">
+    <div class="param"><div class="name">prompt<span class="req">{{docs.required}}</span><span class="type">string</span></div><div class="desc"><p>{{docs.images.p_prompt}}</p></div></div>
+    <div class="param"><div class="name">model<span class="type">string</span></div><div class="desc"><p class="def">{{docs.default}}: <code>muse-image</code></p></div></div>
+    <div class="param"><div class="name">n<span class="type">integer</span></div><div class="desc"><p>{{docs.images.p_n}}</p><p class="def">{{docs.default}}: <code>1</code></p></div></div>
+    <div class="param"><div class="name">size<span class="type">string</span></div><div class="desc"><p>{{docs.images.p_size}}</p></div></div>
+    <div class="param"><div class="name">response_format<span class="type">string</span></div><div class="desc"><p>{{docs.images.p_format}}</p><p class="def">{{docs.default}}: <code>url</code></p></div></div>
+    <div class="param"><div class="name">background<span class="type">string</span></div><div class="desc"><p>{{docs.images.p_background}}</p></div></div>
+    <div class="param"><div class="name">image<span class="type">string | string[]</span></div><div class="desc"><p>{{docs.images.p_image}}</p></div></div>
+    <div class="param"><div class="name">async<span class="type">boolean</span></div><div class="desc"><p>{{docs.images.p_async}}</p><p class="def">{{docs.default}}: <code>false</code></p></div></div>
+  </div>
+
+  <div class="note warn"><svg class="i"><use href="#i-warn"/></svg><div><p>{{docs.images.async_warning}}</p></div></div>
+
+  <h4>{{docs.example}}</h4>
+  <div class="code" data-tabs>
+    <div class="bar"><button class="tab" data-tab="py">Python</button><button class="tab" data-tab="sh">cURL</button></div>
+<pre data-pane="py" data-lang="python"><code>img = client.images.generate(
+    model="muse-image",
+    prompt="A red fox sitting in an autumn forest, morning light, photorealistic",
+    size="16:9",
+)
+print(img.data[0].url)</code></pre>
+<pre data-pane="sh" data-lang="bash"><code>curl https://muse.isemi.io/v1/images/generations \
+  -H "Authorization: Bearer $MUSE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "A red fox sitting in an autumn forest, morning light", "size": "16:9"}'</code></pre>
+  </div>
+  <div class="code"><div class="bar"><span class="label">200 OK</span></div>
+<pre data-lang="json"><code>{
+  "created": 1767225600,
+  "data": [
+    {
+      "url": "https://muse.isemi.io/v1/media/img_3f9a1c2b7d4e5f60.png",
+      "revised_prompt": "A red fox sitting in an autumn forest, morning light"
+    }
+  ],
+  "cost_usd": 0.015
+}</code></pre></div>
+
+  <h3 id="images-refs">{{docs.images.refs_title}}</h3>
+  <p>{{docs.images.refs_intro}}</p>
+  <div class="code"><div class="bar"><span class="label">cURL</span></div>
+<pre data-lang="bash"><code>curl https://muse.isemi.io/v1/images/generations \
+  -H "Authorization: Bearer $MUSE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "A model wearing exactly this hoodie, studio photo",
+    "image": ["https://example.com/hoodie.jpg"],
+    "async": true
+  }'</code></pre></div>
+
+  <h3 id="images-async">{{docs.images.async_title}}</h3>
+  <p>{{docs.images.async_intro}}</p>
+  <div class="endpoint"><span class="m get">GET</span>/v1/images/generations/{id}</div>
+  <div class="code"><div class="bar"><span class="label">Python</span></div>
+<pre data-lang="python"><code>import time, requests
+
+BASE = "https://muse.isemi.io/v1"
+HEADERS = {"Authorization": "Bearer m2a-your-key"}
+
+task = requests.post(f"{BASE}/images/generations", headers=HEADERS, json={
+    "prompt": "A red fox sitting in an autumn forest",
+    "async": True,
+}).json()
+
+while task["status"] in ("queued", "running"):
+    time.sleep(5)
+    task = requests.get(f"{BASE}/images/generations/{task['id']}", headers=HEADERS).json()
+
+if task["status"] == "succeeded":
+    print(task["result"]["data"][0]["url"])
+else:
+    print("Error:", task["error"])</code></pre></div>
+</section>
+
+<!-- ============ edits ============ -->
+<section class="doc" id="images-edits">
+  <h2>{{docs.toc.edits}} <a class="anchor" href="#images-edits">#</a></h2>
+  <div class="endpoint"><span class="m post">POST</span>/v1/images/edits</div>
+  <p>{{docs.edits.intro}}</p>
+  <div class="params">
+    <div class="param"><div class="name">image / image[]<span class="req">{{docs.required}}</span><span class="type">file</span></div><div class="desc"><p>{{docs.edits.p_image}}</p></div></div>
+    <div class="param"><div class="name">prompt<span class="req">{{docs.required}}</span><span class="type">string</span></div><div class="desc"><p>{{docs.edits.p_prompt}}</p></div></div>
+    <div class="param"><div class="name">n, size, response_format, background, async</div><div class="desc"><p>{{docs.edits.p_same}}</p></div></div>
+    <div class="param"><div class="name">mask<span class="type">file</span></div><div class="desc"><p>{{docs.edits.p_mask}}</p></div></div>
+  </div>
+  <div class="code" data-tabs>
+    <div class="bar"><button class="tab" data-tab="py">Python</button><button class="tab" data-tab="sh">cURL</button></div>
+<pre data-pane="py" data-lang="python"><code>img = client.images.edit(
+    model="muse-image",
+    image=[open("fox.png", "rb")],
+    prompt="The same fox, now wearing a red scarf",
+)
+print(img.data[0].url)</code></pre>
+<pre data-pane="sh" data-lang="bash"><code>curl https://muse.isemi.io/v1/images/edits \
+  -H "Authorization: Bearer $MUSE_API_KEY" \
+  -F "image[]=@fox.png" \
+  -F "prompt=The same fox, now wearing a red scarf" \
+  -F "async=true"</code></pre>
+  </div>
+</section>
+
+<!-- ============ videos ============ -->
+<section class="doc" id="videos">
+  <h2>{{docs.toc.videos}} <a class="anchor" href="#videos">#</a></h2>
+  <div class="endpoint"><span class="m post">POST</span>/v1/videos</div>
+  <div class="endpoint"><span class="m get">GET</span>/v1/videos/{id}</div>
+  <p>{{docs.videos.intro}}</p>
+
+  <h4>{{docs.params}}</h4>
+  <div class="params">
+    <div class="param"><div class="name">prompt<span class="req">{{docs.required}}</span><span class="type">string</span></div><div class="desc"><p>{{docs.videos.p_prompt}}</p></div></div>
+    <div class="param"><div class="name">model<span class="type">string</span></div><div class="desc"><p class="def">{{docs.default}}: <code>muse-video</code></p></div></div>
+    <div class="param"><div class="name">size<span class="type">string</span></div><div class="desc"><p>{{docs.videos.p_size}}</p></div></div>
+    <div class="param"><div class="name">duration / seconds<span class="type">integer</span></div><div class="desc"><p>{{docs.videos.p_duration}}</p><p class="def">{{docs.default}}: <code>10</code></p></div></div>
+    <div class="param"><div class="name">image / input_reference<span class="type">string</span></div><div class="desc"><p>{{docs.videos.p_image}}</p></div></div>
+  </div>
+
+  <div class="code" data-tabs>
+    <div class="bar"><button class="tab" data-tab="sh">cURL</button><button class="tab" data-tab="py">Python</button></div>
+<pre data-pane="sh" data-lang="bash"><code># 1. Create the task
+curl https://muse.isemi.io/v1/videos \
+  -H "Authorization: Bearer $MUSE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Maple leaves falling in a light breeze", "duration": 10, "size": "16:9"}'
+
+# 2. Poll until status = succeeded
+curl https://muse.isemi.io/v1/videos/task_9b1e4f2a7c3d8e60 \
+  -H "Authorization: Bearer $MUSE_API_KEY"</code></pre>
+<pre data-pane="py" data-lang="python"><code>import time, requests
+
+BASE = "https://muse.isemi.io/v1"
+HEADERS = {"Authorization": "Bearer m2a-your-key"}
+
+task = requests.post(f"{BASE}/videos", headers=HEADERS, json={
+    "prompt": "Maple leaves falling in a light breeze",
+    "duration": 10,
+    "size": "16:9",
+}).json()
+
+while task["status"] in ("queued", "running"):
+    time.sleep(10)
+    task = requests.get(f"{BASE}/videos/{task['id']}", headers=HEADERS).json()
+    print(task["status"], task["progress"])
+
+print(task["result"]["url"] if task["status"] == "succeeded" else task["error"])</code></pre>
+  </div>
+  <div class="code"><div class="bar"><span class="label">GET /v1/videos/{id}</span></div>
+<pre data-lang="json"><code>{
+  "id": "task_9b1e4f2a7c3d8e60",
+  "object": "video",
+  "status": "succeeded",
+  "progress": 100,
+  "created_at": 1767225600,
+  "model": "muse-video",
+  "result": {
+    "url": "https://muse.isemi.io/v1/media/vid_5c2e8a1f0b3d4e79.mp4",
+    "mime": "video/mp4",
+    "width": 1280,
+    "height": 720
+  },
+  "error": null,
+  "cost_usd": 0.06
+}</code></pre></div>
+</section>
+
+<!-- ============ tasks ============ -->
+<section class="doc" id="tasks">
+  <h2>{{docs.toc.tasks}} <a class="anchor" href="#tasks">#</a></h2>
+  <p>{{docs.tasks.intro}}</p>
+  <div class="params">
+    <div class="param"><div class="name">id<span class="type">string</span></div><div class="desc"><p>{{docs.tasks.f_id}}</p></div></div>
+    <div class="param"><div class="name">object<span class="type">string</span></div><div class="desc"><p>{{docs.tasks.f_object}}</p></div></div>
+    <div class="param"><div class="name">status<span class="type">string</span></div><div class="desc"><div class="steps-flow"><span>queued</span><i>→</i><span>running</span><i>→</i><span>succeeded</span><i>|</i><span>failed</span><i>|</i><span>cancelled</span></div></div></div>
+    <div class="param"><div class="name">progress<span class="type">integer</span></div><div class="desc"><p>{{docs.tasks.f_progress}}</p></div></div>
+    <div class="param"><div class="name">result<span class="type">object | null</span></div><div class="desc"><p>{{docs.tasks.f_result}}</p></div></div>
+    <div class="param"><div class="name">error<span class="type">object | null</span></div><div class="desc"><p>{{docs.tasks.f_error}}</p></div></div>
+    <div class="param"><div class="name">cost_usd<span class="type">number</span></div><div class="desc"><p>{{docs.tasks.f_cost}}</p></div></div>
+  </div>
+  <div class="note"><svg class="i"><use href="#i-info"/></svg><div><p>{{docs.tasks.note}}</p></div></div>
+</section>
+
+<!-- ============ media ============ -->
+<section class="doc" id="media">
+  <h2>{{docs.toc.media}} <a class="anchor" href="#media">#</a></h2>
+  <div class="endpoint"><span class="m get">GET</span>/v1/media/{name}</div>
+  <p>{{docs.media.intro}}</p>
+  <div class="note warn"><svg class="i"><use href="#i-warn"/></svg><div><p>{{docs.media.warning}}</p></div></div>
+</section>
+
+<!-- ============ balance ============ -->
+<section class="doc" id="balance">
+  <h2>{{docs.toc.balance}} <a class="anchor" href="#balance">#</a></h2>
+  <div class="endpoint"><span class="m get">GET</span>/v1/balance</div>
+  <p>{{docs.balance.intro}}</p>
+  <div class="code" data-tabs>
+    <div class="bar"><button class="tab" data-tab="sh">cURL</button><button class="tab" data-tab="py">Python</button></div>
+<pre data-pane="sh" data-lang="bash"><code>curl https://muse.isemi.io/v1/balance -H "Authorization: Bearer $MUSE_API_KEY"</code></pre>
+<pre data-pane="py" data-lang="python"><code>import requests
+
+r = requests.get("https://muse.isemi.io/v1/balance",
+                 headers={"Authorization": "Bearer m2a-your-key"})
+print(r.json()["balance_usd"])</code></pre>
+  </div>
+  <div class="code"><div class="bar"><span class="label">200 OK</span></div>
+<pre data-lang="json"><code>{
+  "object": "balance",
+  "balance_usd": 12.34,
+  "currency": "USD",
+  "unlimited": false
+}</code></pre></div>
+</section>
+
+<!-- ============ list models ============ -->
+<section class="doc" id="list-models">
+  <h2>{{docs.toc.list_models}} <a class="anchor" href="#list-models">#</a></h2>
+  <div class="endpoint"><span class="m get">GET</span>/v1/models</div>
+  <p>{{docs.list_models.intro}}</p>
+  <div class="code"><div class="bar"><span class="label">200 OK</span></div>
+<pre data-lang="json"><code>{
+  "object": "list",
+  "data": [
+    { "id": "muse-chat", "object": "model", "created": 1767225600, "owned_by": "muse", "kind": "chat" },
+    { "id": "muse-image", "object": "model", "created": 1767225600, "owned_by": "muse", "kind": "image" },
+    { "id": "muse-video", "object": "model", "created": 1767225600, "owned_by": "muse", "kind": "video" },
+    { "id": "gpt-4o", "object": "model", "created": 1767225600, "owned_by": "muse", "kind": "chat", "alias_of": "muse-chat" }
+  ]
+}</code></pre></div>
+</section>
+
+<!-- ============ errors ============ -->
+<section class="doc" id="errors">
+  <h2>{{docs.toc.errors}} <a class="anchor" href="#errors">#</a></h2>
+  <p>{{docs.errors.intro}}</p>
+  <div class="code"><div class="bar"><span class="label">Error body</span></div>
+<pre data-lang="json"><code>{
+  "error": {
+    "message": "insufficient balance: this request costs $0.015000, balance is $0.004000; top up to continue",
+    "type": "insufficient_quota",
+    "code": "insufficient_balance"
+  }
+}</code></pre></div>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>Status</th><th>{{docs.errors.col_meaning}}</th><th>{{docs.errors.col_action}}</th></tr></thead>
+    <tbody>
+      <tr><td><span class="status">400</span></td><td>{{docs.errors.e400}}</td><td>{{docs.errors.a400}}</td></tr>
+      <tr><td><span class="status">401</span></td><td>{{docs.errors.e401}}</td><td>{{docs.errors.a401}}</td></tr>
+      <tr><td><span class="status">402</span></td><td>{{docs.errors.e402}}</td><td>{{docs.errors.a402}}</td></tr>
+      <tr><td><span class="status">404</span></td><td>{{docs.errors.e404}}</td><td>{{docs.errors.a404}}</td></tr>
+      <tr><td><span class="status">429</span></td><td>{{docs.errors.e429}}</td><td>{{docs.errors.a429}}</td></tr>
+      <tr><td><span class="status">501</span></td><td>{{docs.errors.e501}}</td><td>{{docs.errors.a501}}</td></tr>
+      <tr><td><span class="status">502</span></td><td>{{docs.errors.e502}}</td><td>{{docs.errors.a502}}</td></tr>
+      <tr><td><span class="status">503</span></td><td>{{docs.errors.e503}}</td><td>{{docs.errors.a503}}</td></tr>
+      <tr><td><span class="status">504</span></td><td>{{docs.errors.e504}}</td><td>{{docs.errors.a504}}</td></tr>
+    </tbody>
+  </table></div>
+  <p>{{docs.errors.retry}}</p>
+</section>
+
+<!-- ============ integrations ============ -->
+<section class="doc" id="integrations">
+  <h2>{{docs.toc.integrations}} <a class="anchor" href="#integrations">#</a></h2>
+  <p>{{docs.integrations.intro}}</p>
+  <div class="grid2">
+    <div class="card"><h4>API base URL</h4><p><code><span class="base">https://muse.isemi.io</span>/v1</code></p></div>
+    <div class="card"><h4>API key</h4><p>{{docs.integrations.key_card}}</p></div>
+  </div>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>App</th><th>{{docs.integrations.col_notes}}</th></tr></thead>
+    <tbody>
+      <tr><td>LobeChat</td><td>{{docs.integrations.lobechat}}</td></tr>
+      <tr><td>Open WebUI</td><td>{{docs.integrations.openwebui}}</td></tr>
+      <tr><td>Cherry Studio</td><td>{{docs.integrations.cherry}}</td></tr>
+      <tr><td>ChatGPT-Next-Web</td><td>{{docs.integrations.nextweb}}</td></tr>
+      <tr><td>n8n, Dify, LangChain…</td><td>{{docs.integrations.others}}</td></tr>
+    </tbody>
+  </table></div>
+  <p>{{docs.integrations.manual_models}}</p>
+</section>
+
+<!-- ============ limits ============ -->
+<section class="doc" id="limits">
+  <h2>{{docs.toc.limits}} <a class="anchor" href="#limits">#</a></h2>
+  <div class="tbl-wrap"><table class="tbl">
+    <thead><tr><th>{{docs.limits.col_item}}</th><th>{{docs.limits.col_limit}}</th></tr></thead>
+    <tbody>
+      <tr><td>{{docs.limits.n}}</td><td>1–4</td></tr>
+      <tr><td>{{docs.limits.refs}}</td><td>{{docs.limits.refs_value}}</td></tr>
+      <tr><td>{{docs.limits.duration}}</td><td>{{docs.limits.duration_value}}</td></tr>
+      <tr><td>{{docs.limits.max_time}}</td><td>{{docs.limits.max_time_value}}</td></tr>
+      <tr><td>{{docs.limits.first_token}}</td><td>{{docs.limits.first_token_value}}</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li>{{docs.limits.unknown_params}}</li>
+    <li>{{docs.limits.unsupported}}</li>
+    <li>{{docs.limits.policy}}</li>
+  </ul>
+</section>
+
+<div class="foot">
+  <span>© <span id="year">2026</span> ISEMI</span>
+  <a href="/">{{common.nav.home}}</a>
+  <a href="/#pricing">{{common.nav.pricing}}</a>
+  <a href="mailto:{{support_email}}">{{common.footer.support}} · {{support_email}}</a>
+</div>
+</main>
+</div>
+
+<script>
+(() => {
+  // Samples name the production host; show whatever host served this page.
+  const origin = location.origin;
+  const PROD = "https://muse.isemi.io";
+  if (/^https?:/.test(origin) && origin !== PROD) {
+    document.querySelectorAll(".base").forEach(el => { el.textContent = origin; });
+    document.querySelectorAll("pre code").forEach(el => { el.textContent = el.textContent.split(PROD).join(origin); });
+  }
+  document.getElementById("year").textContent = new Date().getFullYear();
+  // Keep the section in view when switching language.
+  document.querySelectorAll(".lang a").forEach(a => a.addEventListener("click", () => { a.href += location.hash; }));
+
+  // Minimal syntax colouring.
+  const KW = {
+    python: "from|import|as|def|return|for|in|if|else|while|with|await|async|True|False|None|print|open",
+    js: "import|from|const|let|await|async|new|for|of|if|else|return|true|false|null|console|process",
+    bash: "curl",
+  };
+  const esc = s => s.replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c]));
+  function highlight(src, lang) {
+    const alts = [
+      ["key", lang === "json" || lang === "sse" ? String.raw`"(?:[^"\\\n]|\\.)*"(?=\s*:)` : null],
+      ["str", String.raw`"(?:[^"\\\n]|\\.)*"` + (lang === "json" || lang === "sse" ? "" : String.raw`|'(?:[^'\\]|\\.)*'`)],
+      ["com", lang === "js" ? String.raw`\/\/[^\n]*` : lang === "json" || lang === "sse" ? null : String.raw`(?:^|[ \t])#[^\n]*`],
+      ["flag", lang === "bash" ? String.raw`[ \t]-{1,2}[A-Za-z][\w-]*|\$[A-Z_][A-Z0-9_]*` : lang === "sse" ? String.raw`^data:` : lang === "http" ? String.raw`^[A-Za-z-]+(?=:)` : null],
+      ["kw", KW[lang] ? String.raw`\b(?:${KW[lang]})\b` : lang === "json" || lang === "sse" ? String.raw`\b(?:true|false|null)\b` : null],
+      ["num", lang === "http" ? null : String.raw`\b\d+(?:\.\d+)?\b`],
+    ].filter(a => a[1]);
+    const re = new RegExp(alts.map(a => `(${a[1]})`).join("|"), "gm");
+    let out = "", last = 0, m;
+    while ((m = re.exec(src))) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      const kind = alts[m.slice(1).findIndex(Boolean)][0];
+      out += esc(src.slice(last, m.index)) + `<span class="tok-${kind}">${esc(m[0])}</span>`;
+      last = m.index + m[0].length;
+    }
+    return out + esc(src.slice(last));
+  }
+  document.querySelectorAll("pre[data-lang] code").forEach(el => {
+    try { el.innerHTML = highlight(el.textContent, el.parentElement.dataset.lang); } catch {}
+  });
+
+  // Copy buttons and tabs. The chosen language sticks across blocks.
+  const copyIcon = '<svg class="i"><use href="#i-copy"/></svg>' + document.body.dataset.copy;
+  let lang = "py";
+  try { lang = localStorage.getItem("muse-docs.lang") || lang; } catch {}
+  function showTab(block, want) {
+    const tabs = [...block.querySelectorAll(".tab")];
+    const tab = tabs.find(t => t.dataset.tab === want) || tabs[0];
+    tabs.forEach(t => t.setAttribute("aria-selected", String(t === tab)));
+    block.querySelectorAll("pre[data-pane]").forEach(p => { p.hidden = p.dataset.pane !== tab.dataset.tab; });
+  }
+  document.querySelectorAll(".code").forEach(block => {
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "copy"; btn.innerHTML = copyIcon;
+    block.querySelector(".bar").appendChild(btn);
+    btn.addEventListener("click", async () => {
+      const pre = block.querySelector("pre:not([hidden])");
+      try { await navigator.clipboard.writeText(pre.textContent); } catch { return; }
+      btn.innerHTML = '<svg class="i"><use href="#i-check"/></svg>' + document.body.dataset.copied;
+      setTimeout(() => { btn.innerHTML = copyIcon; }, 1400);
+    });
+    if (!block.hasAttribute("data-tabs")) return;
+    block.querySelector(".bar").setAttribute("role", "tablist");
+    block.querySelectorAll(".tab").forEach(t => {
+      t.setAttribute("role", "tab");
+      t.addEventListener("click", () => {
+        lang = t.dataset.tab;
+        try { localStorage.setItem("muse-docs.lang", lang); } catch {}
+        document.querySelectorAll(".code[data-tabs]").forEach(b => showTab(b, lang));
+      });
+    });
+    showTab(block, lang);
+  });
+
+  // Highlight the section in view.
+  const links = new Map([...document.querySelectorAll(".toc a")].map(a => [a.getAttribute("href").slice(1), a]));
+  const sections = [...links.keys()].map(id => document.getElementById(id)).filter(Boolean);
+  const mark = () => {
+    let current = sections[0];
+    for (const s of sections) if (s.getBoundingClientRect().top < 120) current = s;
+    links.forEach((a, id) => a.classList.toggle("on", id === current.id));
+  };
+  addEventListener("scroll", mark, {passive: true});
+  mark();
+
+  // Mobile table of contents.
+  const burger = document.getElementById("burger");
+  const setNav = open => { document.body.classList.toggle("nav-open", open); burger.setAttribute("aria-expanded", String(open)); };
+  burger.addEventListener("click", () => setNav(!document.body.classList.contains("nav-open")));
+  document.getElementById("scrim").addEventListener("click", () => setNav(false));
+  document.querySelectorAll(".toc a").forEach(a => a.addEventListener("click", () => setNav(false)));
+})();
+</script>
+</body>
+</html>

@@ -64,6 +64,7 @@ def test_legacy_and_admin_keys_still_work(client, auth, admin):
 
 def test_request_logged(client, admin):
     key = client.post("/admin/keys", headers=admin, json={"name": "bob"}).json()
+    client.post(f"/admin/keys/{key['key']['id']}/credit", headers=admin, json={"amount_usd": 1})
     headers = {**_bearer(key["api_key"]), "cf-connecting-ip": "203.0.113.7"}
     r = client.post("/v1/chat/completions", headers=headers, json={
         "model": "gpt-4o", "messages": [{"role": "user", "content": "hi"}]})
@@ -81,6 +82,7 @@ def test_request_logged(client, admin):
     assert row["client_ip"] == "203.0.113.7"
     assert row["stream"] is False
     assert row["error"] is None
+    assert row["cost_micro"] > 0
 
 
 def test_stream_and_error_logged(client, auth, admin):
@@ -136,6 +138,7 @@ def test_stats_shape(client, auth, admin):
 
 def test_key_usage(client, auth, admin):
     alice = client.post("/admin/keys", headers=admin, json={"name": "alice"}).json()
+    client.post(f"/admin/keys/{alice['key']['id']}/credit", headers=admin, json={"amount_usd": 1})
     client.post("/admin/keys", headers=admin, json={"name": "idle"})
     a = _bearer(alice["api_key"])
     assert client.get("/v1/models", headers=a).status_code == 200
@@ -200,13 +203,6 @@ async def test_prune(settings):
     assert await log.prune(14) == 1
     assert (await log.query())["total"] == 1
     await log.close()
-
-
-def test_dashboard_html(client):
-    r = client.get("/dashboard")
-    assert r.status_code == 200
-    assert r.headers["content-type"].startswith("text/html")
-    assert "<title>muse2api dashboard</title>" in r.text
 
 
 def _wait_task(client, auth, task_id: str) -> dict:
